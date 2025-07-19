@@ -1,0 +1,1969 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI简历分析系统</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 左侧工作台 -->
+        <div class="workspace">
+            <div class="workspace-header">
+                <div class="workspace-title">工作台</div>
+                <div class="workspace-subtitle">AI简历分析系统</div>
+            </div>
+
+            <div class="workspace-content">
+                <!-- 我的项目 -->
+                <div class="workspace-section">
+                    <div class="section-header" data-section="projects">
+                        <span>我的项目</span>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="section-content" id="projectsSection">
+                        <div class="add-project" onclick="showNewProjectInput()">
+                            <span>+ 新建项目</span>
+                        </div>
+                        <div class="new-project-input" id="newProjectInput">
+                            <input type="text" placeholder="输入项目名称" onkeypress="handleNewProject(event)">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API接口测试 -->
+                <div class="workspace-section">
+                    <div class="section-header" data-section="api">
+                        <span>测试新的API接口</span>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="section-content" id="apiSection">
+                        <div class="nav-item" data-page="api-test">
+                            <span class="nav-icon">🔧</span>
+                            <span>API测试</span>
+                        </div>
+                        <div class="nav-item" data-page="api-config">
+                            <span class="nav-icon">⚙️</span>
+                            <span>接口配置</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI对话 -->
+                <div class="workspace-section">
+                    <div class="section-header" data-section="ai">
+                        <span>AI对话</span>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="section-content" id="aiSection">
+                        <div class="nav-item" data-page="ai-chat">
+                            <span class="nav-icon">💬</span>
+                            <span>智能对话</span>
+                        </div>
+                        <div class="nav-item" data-page="ai-analysis">
+                            <span class="nav-icon">🤖</span>
+                            <span>智能分析</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 数据管理 -->
+                <div class="workspace-section">
+                    <div class="section-header active" data-section="data">
+                        <span>数据（知识库）检索</span>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="section-content" id="dataSection">
+                        <div class="nav-item active" data-page="dashboard">
+                            <span class="nav-icon">📊</span>
+                            <span>仪表板</span>
+                        </div>
+                        <div class="nav-item" data-page="resumes">
+                            <span class="nav-icon">📋</span>
+                            <span>简历管理</span>
+                        </div>
+                        <div class="nav-item" data-page="analytics">
+                            <span class="nav-icon">📈</span>
+                            <span>数据分析</span>
+                        </div>
+                        <div class="nav-item" data-page="knowledge">
+                            <span class="nav-icon">📚</span>
+                            <span>知识库</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 数据上传 -->
+                <div class="workspace-section">
+                    <div class="section-header" data-section="upload">
+                        <span>数据上传</span>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="section-content" id="uploadSection">
+                        <div class="nav-item" data-page="upload-resume">
+                            <span class="nav-icon">📄</span>
+                            <span>个人简历上传</span>
+                        </div>
+                        <div class="nav-item" data-page="upload-company">
+                            <span class="nav-icon">🏢</span>
+                            <span>公司介绍上传</span>
+                        </div>
+                        <div class="nav-item" data-page="upload-job">
+                            <span class="nav-icon">💼</span>
+                            <span>工作条件上传</span>
+                        </div>
+                        <div class="nav-item" data-page="upload-knowledge">
+                            <span class="nav-icon">📝</span>
+                            <span>知识纪要上传</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 系统设置 -->
+                <div class="workspace-section">
+                    <div class="section-header" data-section="settings">
+                        <span>系统设置</span>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="section-content" id="settingsSection">
+                        <div class="nav-item" data-page="settings">
+                            <span class="nav-icon">⚙️</span>
+                            <span>系统配置</span>
+                        </div>
+                        <div class="nav-item" data-page="user-settings">
+                            <span class="nav-icon">👤</span>
+                            <span>用户设置</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主内容区域 -->
+        <div class="main-content">
+            <!-- 顶部导航栏 -->
+            <div class="top-bar">
+                <div class="breadcrumb">
+                    <span class="breadcrumb-item">首页</span>
+                    <span>›</span>
+                    <span class="breadcrumb-item active" id="currentPage">仪表板</span>
+                </div>
+                <div class="user-actions">
+                    <button class="action-btn secondary" onclick="testConnection()">测试连接</button>
+                    <button class="action-btn" onclick="refreshData()">刷新数据</button>
+                </div>
+            </div>
+
+            <!-- 页面内容 -->
+            <div class="page-content">
+                <!-- 仪表板页面 -->
+                <div class="content-area active" id="dashboard">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">📋</div>
+                            <div class="stat-number" id="totalResumes">0</div>
+                            <div class="stat-label">总简历数</div>
+                            <div class="stat-trend">+5% 本周</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🆕</div>
+                            <div class="stat-number" id="newResumes">0</div>
+                            <div class="stat-label">今日新增</div>
+                            <div class="stat-trend">+12% 较昨日</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🎯</div>
+                            <div class="stat-number" id="avgSkills">0</div>
+                            <div class="stat-label">平均技能数</div>
+                            <div class="stat-trend">+8% 本月</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⭐</div>
+                            <div class="stat-number">96%</div>
+                            <div class="stat-label">解析成功率</div>
+                            <div class="stat-trend">+2% 本月</div>
+                        </div>
+                    </div>
+
+                    <div class="controls-panel">
+                        <div class="controls-row">
+                            <div class="search-box">
+                                <input type="text" class="search-input" id="searchInput" placeholder="搜索简历...">
+                                <span class="search-icon">🔍</span>
+                            </div>
+                            <div class="filter-group">
+                                <select class="filter-select" id="skillFilter">
+                                    <option value="">所有技能</option>
+                                </select>
+                                <select class="filter-select" id="eduFilter">
+                                    <option value="">所有学历</option>
+                                </select>
+                                <button class="action-btn" onclick="exportData()">导出数据</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="resume-grid" id="resumeGrid">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            正在加载简历数据...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 简历管理页面 -->
+                <div class="content-area" id="resumes">
+                    <h2 style="margin-bottom: 20px;">简历管理</h2>
+                    <div class="resume-grid" id="resumeManagementGrid">
+                        <!-- 简历管理内容 -->
+                    </div>
+                </div>
+
+                <!-- 项目文件上传页面 -->
+                <div class="content-area" id="project-upload">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <h2 id="projectUploadTitle">项目文件上传</h2>
+                            <span class="page-type-indicator project">项目存储</span>
+                        </div>
+                        <button class="action-btn secondary" onclick="loadProjectFiles()">查看已上传文件</button>
+                    </div>
+                    <div class="upload-area" id="uploadArea-project">
+                        <div class="upload-icon">📁</div>
+                        <div class="upload-text">拖放文件到此处，或点击上传</div>
+                        <div class="upload-hint">支持 PDF、DOC、DOCX、TXT、图片等格式 | 支持多文件选择和文件夹上传</div>
+                        <input type="file" id="fileInput-project" style="display: none;" accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif,.xls,.xlsx,.ppt,.pptx,.md" multiple>
+                        <div style="margin-top: 15px;">
+                            <button class="action-btn secondary" onclick="selectFiles('project')">选择文件</button>
+                            <button class="action-btn secondary" onclick="selectFolder('project')" style="margin-left: 10px;">选择文件夹</button>
+                        </div>
+                    </div>
+                    <div id="uploadProgress-project" style="display: none;">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            正在上传文件...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 上传简历页面 -->
+                <div class="content-area" id="upload-resume">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <h2>个人简历上传</h2>
+                            <span class="page-type-indicator category">分类存储</span>
+                        </div>
+                        <button class="action-btn secondary" onclick="loadCategoryFiles('resume')">查看已上传文件</button>
+                    </div>
+                    <div class="upload-area" id="uploadArea-resume">
+                        <div class="upload-icon">📄</div>
+                        <div class="upload-text">拖放简历文件到此处，或点击上传</div>
+                        <div class="upload-hint">支持 PDF、DOC、DOCX 格式 | 支持多文件选择和文件夹上传</div>
+                        <input type="file" id="fileInput-resume" style="display: none;" accept=".pdf,.doc,.docx" multiple>
+                        <div style="margin-top: 15px;">
+                            <button class="action-btn secondary" onclick="selectFiles('resume')">选择文件</button>
+                            <button class="action-btn secondary" onclick="selectFolder('resume')" style="margin-left: 10px;">选择文件夹</button>
+                        </div>
+                    </div>
+                    <div id="uploadProgress-resume" style="display: none;">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            正在上传并解析简历...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 公司介绍上传页面 -->
+                <div class="content-area" id="upload-company">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <h2>公司介绍上传</h2>
+                            <span class="page-type-indicator category">分类存储</span>
+                        </div>
+                        <button class="action-btn secondary" onclick="loadCategoryFiles('company')">查看已上传文件</button>
+                    </div>
+                    <div class="upload-area" id="uploadArea-company">
+                        <div class="upload-icon">🏢</div>
+                        <div class="upload-text">上传公司介绍文件</div>
+                        <div class="upload-hint">支持 PDF、DOC、DOCX、TXT 格式 | 支持多文件选择和文件夹上传</div>
+                        <input type="file" id="fileInput-company" style="display: none;" accept=".pdf,.doc,.docx,.txt" multiple>
+                        <div style="margin-top: 15px;">
+                            <button class="action-btn secondary" onclick="selectFiles('company')">选择文件</button>
+                            <button class="action-btn secondary" onclick="selectFolder('company')" style="margin-left: 10px;">选择文件夹</button>
+                        </div>
+                    </div>
+                    <div id="uploadProgress-company" style="display: none;">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            正在上传文件...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 工作条件上传页面 -->
+                <div class="content-area" id="upload-job">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <h2>工作条件上传</h2>
+                            <span class="page-type-indicator category">分类存储</span>
+                        </div>
+                        <button class="action-btn secondary" onclick="loadCategoryFiles('job')">查看已上传文件</button>
+                    </div>
+                    <div class="upload-area" id="uploadArea-job">
+                        <div class="upload-icon">💼</div>
+                        <div class="upload-text">上传工作条件说明</div>
+                        <div class="upload-hint">支持 PDF、DOC、DOCX、TXT 格式 | 支持多文件选择和文件夹上传</div>
+                        <input type="file" id="fileInput-job" style="display: none;" accept=".pdf,.doc,.docx,.txt" multiple>
+                        <div style="margin-top: 15px;">
+                            <button class="action-btn secondary" onclick="selectFiles('job')">选择文件</button>
+                            <button class="action-btn secondary" onclick="selectFolder('job')" style="margin-left: 10px;">选择文件夹</button>
+                        </div>
+                    </div>
+                    <div id="uploadProgress-job" style="display: none;">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            正在上传文件...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 知识纪要上传页面 -->
+                <div class="content-area" id="upload-knowledge">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <h2>知识纪要上传</h2>
+                            <span class="page-type-indicator category">分类存储</span>
+                        </div>
+                        <button class="action-btn secondary" onclick="loadCategoryFiles('knowledge')">查看已上传文件</button>
+                    </div>
+                    <div class="upload-area" id="uploadArea-knowledge">
+                        <div class="upload-icon">📝</div>
+                        <div class="upload-text">上传知识库文档</div>
+                        <div class="upload-hint">支持 PDF、DOC、DOCX、TXT、MD 格式 | 支持多文件选择和文件夹上传</div>
+                        <input type="file" id="fileInput-knowledge" style="display: none;" accept=".pdf,.doc,.docx,.txt,.md" multiple>
+                        <div style="margin-top: 15px;">
+                            <button class="action-btn secondary" onclick="selectFiles('knowledge')">选择文件</button>
+                            <button class="action-btn secondary" onclick="selectFolder('knowledge')" style="margin-left: 10px;">选择文件夹</button>
+                        </div>
+                    </div>
+                    <div id="uploadProgress-knowledge" style="display: none;">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            正在上传文件...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API测试页面 -->
+                <div class="content-area" id="api-test">
+                    <h2 style="margin-bottom: 20px;">API接口测试</h2>
+                    <div class="stat-card">
+                        <h3 style="margin-bottom: 15px;">接口测试工具</h3>
+                        <div class="info-row">
+                            <span class="info-label">当前API:</span>
+                            <span class="info-value" id="currentApiUrl">http://localhost:5000/api</span>
+                        </div>
+                        <div style="margin-top: 20px;">
+                            <button class="action-btn" onclick="testAllEndpoints()">测试所有接口</button>
+                            <button class="action-btn secondary" onclick="getSystemInfo()" style="margin-left: 10px;">获取系统信息</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI对话页面 -->
+                <div class="content-area" id="ai-chat">
+                    <h2 style="margin-bottom: 20px;">AI智能对话</h2>
+                    <div class="stat-card">
+                        <h3 style="margin-bottom: 15px;">智能助手</h3>
+                        <p>AI对话功能开发中...</p>
+                    </div>
+                </div>
+
+                <!-- 数据分析页面 -->
+                <div class="content-area" id="analytics">
+                    <h2 style="margin-bottom: 20px;">数据分析</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">🏫</div>
+                            <div class="stat-number">985</div>
+                            <div class="stat-label">985院校比例</div>
+                            <div class="stat-trend">35%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">💼</div>
+                            <div class="stat-number">3.2年</div>
+                            <div class="stat-label">平均工作经验</div>
+                            <div class="stat-trend">经验分布均匀</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🔧</div>
+                            <div class="stat-number">Java</div>
+                            <div class="stat-label">热门技能</div>
+                            <div class="stat-trend">45% 掌握率</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🌍</div>
+                            <div class="stat-number">北京</div>
+                            <div class="stat-label">主要城市</div>
+                            <div class="stat-trend">28% 分布</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 知识库页面 -->
+                <div class="content-area" id="knowledge">
+                    <h2 style="margin-bottom: 20px;">知识库管理</h2>
+                    <div class="stat-card">
+                        <h3 style="margin-bottom: 15px;">知识库统计</h3>
+                        <div class="info-row">
+                            <span class="info-label">文档总数:</span>
+                            <span class="info-value">156</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">今日新增:</span>
+                            <span class="info-value">8</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">检索次数:</span>
+                            <span class="info-value">1,245</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 系统设置页面 -->
+                <div class="content-area" id="settings">
+                    <h2 style="margin-bottom: 20px;">系统设置</h2>
+                    <div class="stat-card">
+                        <h3 style="margin-bottom: 15px;">API配置</h3>
+                        <div class="info-row">
+                            <span class="info-label">API地址:</span>
+                            <span class="info-value" id="apiUrl">http://localhost:5000/api</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">数据库:</span>
+                            <span class="info-value">MongoDB (ai_resume)</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">文件存储:</span>
+                            <span class="info-value">本地文件系统</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">状态:</span>
+                            <span class="info-value" id="connectionStatus">检查中...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 项目管理模态框 -->
+    <div class="modal" id="projectManagerModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>项目管理</h3>
+                <button class="close-btn" onclick="closeProjectManager()">×</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 10px;">创建新项目</h4>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="newProjectNameInput" placeholder="项目名称" style="flex: 1; padding: 8px 12px; border: 1px solid #dadce0; border-radius: 6px;">
+                        <input type="text" id="newProjectDescInput" placeholder="项目描述（可选）" style="flex: 2; padding: 8px 12px; border: 1px solid #dadce0; border-radius: 6px;">
+                        <button class="action-btn" onclick="createProjectFromModal()">创建</button>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 style="margin-bottom: 10px;">现有项目</h4>
+                    <div id="projectManagerList">
+                        <!-- 项目列表将在这里动态生成 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 详情模态框 -->
+    <div class="modal" id="detailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">详情</h3>
+                <button class="close-btn" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- 详情内容 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 状态消息 -->
+    <div class="status-message" id="statusMessage"></div>
+
+    <script>
+        // 全局变量
+        const API_BASE_URL = 'http://localhost:5000/api';
+        let allResumes = [];
+        let filteredResumes = [];
+        let currentPage = 'dashboard';
+        let currentProject = null;
+        let allProjects = [];
+        let currentCategoryFiles = {}; // 存储各类别的文件列表
+        let currentProjectFiles = []; // 存储当前项目的文件列表
+
+        // 文件类别映射
+        const FILE_CATEGORIES = {
+            'resume': '个人简历',
+            'company': '公司介绍',
+            'job': '工作条件',
+            'knowledge': '知识纪要'
+        };
+
+        // 创建日志对象
+        const logger = {
+            info: (message) => {
+                console.log(`[INFO] ${message}`);
+            },
+            error: (message) => {
+                console.error(`[ERROR] ${message}`);
+            },
+            warn: (message) => {
+                console.warn(`[WARN] ${message}`);
+            }
+        };
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        async function initializeApp() {
+            setupEventListeners();
+            await loadProjects();
+            await loadData();
+            updateStats();
+        }
+
+        function setupEventListeners() {
+            // 侧边栏导航点击
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const page = this.dataset.page;
+                    if (page) {
+                        switchPage(page);
+                    }
+                });
+            });
+
+            // 分区折叠/展开
+            document.querySelectorAll('.section-header').forEach(header => {
+                header.addEventListener('click', function() {
+                    toggleSection(this.dataset.section);
+                });
+            });
+
+            // 搜索
+            document.getElementById('searchInput').addEventListener('input', handleSearch);
+
+            // 为每个类别设置上传事件
+            Object.keys(FILE_CATEGORIES).forEach(category => {
+                setupCategoryUpload(category);
+            });
+
+            // 为项目上传设置事件
+            setupProjectUpload();
+
+            // 模态框点击外部关闭
+            document.getElementById('detailModal').addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+            });
+
+            document.getElementById('projectManagerModal').addEventListener('click', function(e) {
+                if (e.target === this) closeProjectManager();
+            });
+        }
+
+        function setupCategoryUpload(category) {
+            const uploadArea = document.getElementById(`uploadArea-${category}`);
+            const fileInput = document.getElementById(`fileInput-${category}`);
+
+            if (!uploadArea || !fileInput) return;
+
+            uploadArea.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') return;
+                fileInput.click();
+            });
+
+            uploadArea.addEventListener('dragover', handleDragOver);
+            uploadArea.addEventListener('dragleave', handleDragLeave);
+            uploadArea.addEventListener('drop', (e) => handleDrop(e, category));
+
+            fileInput.addEventListener('change', (e) => handleFileSelect(e, category));
+        }
+
+        function setupProjectUpload() {
+            const uploadArea = document.getElementById('uploadArea-project');
+            const fileInput = document.getElementById('fileInput-project');
+
+            if (!uploadArea || !fileInput) return;
+
+            uploadArea.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') return;
+                fileInput.click();
+            });
+
+            uploadArea.addEventListener('dragover', handleDragOver);
+            uploadArea.addEventListener('dragleave', handleDragLeave);
+            uploadArea.addEventListener('drop', (e) => handleDrop(e, 'project'));
+
+            fileInput.addEventListener('change', (e) => handleFileSelect(e, 'project'));
+        }
+
+        function selectFiles(category) {
+            const fileInput = document.getElementById(`fileInput-${category}`);
+            if (fileInput) {
+                fileInput.removeAttribute('webkitdirectory');
+                fileInput.click();
+            }
+        }
+
+        function selectFolder(category) {
+            const fileInput = document.getElementById(`fileInput-${category}`);
+            if (fileInput) {
+                fileInput.setAttribute('webkitdirectory', '');
+                fileInput.click();
+            }
+        }
+
+        function switchProject(projectId) {
+            document.querySelectorAll('.project-item').forEach(item => {
+                item.classList.remove('active');
+            });
+
+            const projectElement = document.querySelector(`[data-project="${projectId}"]`);
+            if (projectElement) {
+                projectElement.classList.add('active');
+            }
+
+            currentProject = projectId;
+            const project = allProjects.find(p => p._id === projectId);
+            const projectName = project ? project.name : '未知项目';
+
+            // 切换到项目文件上传页面
+            switchPage('project-upload');
+
+            // 更新项目上传页面的标题
+            const titleElement = document.getElementById('projectUploadTitle');
+            if (titleElement) {
+                titleElement.textContent = `${projectName} - 文件上传`;
+            }
+
+            showMessage(`已切换到项目: ${projectName}`, 'info');
+
+            // 加载项目文件列表
+            loadProjectFiles();
+        }
+
+        function toggleSection(sectionId) {
+            const header = document.querySelector(`[data-section="${sectionId}"]`);
+            const content = document.getElementById(sectionId + 'Section');
+
+            header.classList.toggle('collapsed');
+            content.classList.toggle('collapsed');
+        }
+
+        function switchPage(page) {
+            // 更新导航状态
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+
+            const navItem = document.querySelector(`[data-page="${page}"]`);
+            if (navItem) {
+                navItem.classList.add('active');
+            }
+
+            // 更新面包屑
+            const pageNames = {
+                'dashboard': '仪表板',
+                'resumes': '简历管理',
+                'project-upload': '项目文件上传',
+                'upload-resume': '个人简历上传',
+                'upload-company': '公司介绍上传',
+                'upload-job': '工作条件上传',
+                'upload-knowledge': '知识纪要上传',
+                'api-test': 'API测试',
+                'ai-chat': 'AI对话',
+                'analytics': '数据分析',
+                'knowledge': '知识库',
+                'settings': '系统设置'
+            };
+            document.getElementById('currentPage').textContent = pageNames[page] || page;
+
+            // 切换页面内容
+            document.querySelectorAll('.content-area').forEach(area => {
+                area.classList.remove('active');
+            });
+            document.getElementById(page).classList.add('active');
+
+            currentPage = page;
+
+            // 加载页面特定内容
+            if (page === 'resumes') {
+                loadResumeManagement();
+            } else if (page === 'settings') {
+                checkConnectionStatus();
+            } else if (page.startsWith('upload-')) {
+                const category = page.replace('upload-', '');
+                if (FILE_CATEGORIES[category]) {
+                    loadCategoryFiles(category);
+                }
+            } else if (page === 'project-upload') {
+                loadProjectFiles();
+            }
+        }
+
+        function showNewProjectInput() {
+            const inputDiv = document.getElementById('newProjectInput');
+            inputDiv.style.display = 'block';
+            inputDiv.querySelector('input').focus();
+        }
+
+        function handleNewProject(event) {
+            if (event.key === 'Enter') {
+                const input = event.target;
+                const projectName = input.value.trim();
+
+                if (projectName) {
+                    createProject(projectName).then(success => {
+                        if (success) {
+                            input.value = '';
+                            document.getElementById('newProjectInput').style.display = 'none';
+                        }
+                    });
+                }
+            } else if (event.key === 'Escape') {
+                event.target.value = '';
+                document.getElementById('newProjectInput').style.display = 'none';
+            }
+        }
+
+        async function loadProjects() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/projects`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                allProjects = await response.json();
+                renderProjectList();
+
+                if (!currentProject && allProjects.length > 0) {
+                    currentProject = allProjects[0]._id;
+                }
+
+                logger.info(`成功加载 ${allProjects.length} 个项目`);
+
+            } catch (error) {
+                console.error('加载项目失败:', error);
+                showMessage('加载项目失败: ' + error.message, 'error');
+            }
+        }
+
+        function renderProjectList() {
+            const projectsSection = document.getElementById('projectsSection');
+            if (!projectsSection) return;
+
+            const addProjectElement = projectsSection.querySelector('.add-project');
+            const newProjectInputElement = projectsSection.querySelector('.new-project-input');
+
+            const projectItems = projectsSection.querySelectorAll('.project-item');
+            projectItems.forEach(item => item.remove());
+
+            allProjects.forEach((project, index) => {
+                const projectElement = document.createElement('div');
+                projectElement.className = `project-item ${index === 0 && !currentProject ? 'active' : ''}`;
+                projectElement.setAttribute('data-project', project._id);
+                projectElement.innerHTML = `
+                    <div class="project-dot"></div>
+                    <span title="${project.description || project.name}">${project.name}</span>
+                `;
+
+                projectElement.addEventListener('click', function() {
+                    switchProject(project._id);
+                });
+
+                projectsSection.insertBefore(projectElement, addProjectElement);
+            });
+
+            if (!currentProject && allProjects.length > 0) {
+                currentProject = allProjects[0]._id;
+                document.querySelector(`[data-project="${currentProject}"]`)?.classList.add('active');
+            }
+        }
+
+        async function createProject(name, description = '') {
+            try {
+                const response = await fetch(`${API_BASE_URL}/projects`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name, description })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(`项目 "${name}" 创建成功`, 'success');
+                    await loadProjects();
+
+                    if (result.project) {
+                        switchProject(result.project._id);
+                    }
+
+                    return true;
+                } else {
+                    showMessage(result.error || '创建项目失败', 'error');
+                    return false;
+                }
+
+            } catch (error) {
+                console.error('创建项目失败:', error);
+                showMessage('创建项目失败: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        async function loadData() {
+            try {
+                showMessage('正在加载数据...', 'info');
+                const response = await fetch(`${API_BASE_URL}/resume/all`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                allResumes = data;
+                filteredResumes = [...allResumes];
+
+                renderResumeGrid();
+                updateFilters();
+                showMessage('数据加载成功', 'success');
+
+            } catch (error) {
+                console.error('加载数据失败:', error);
+                showMessage('数据加载失败: ' + error.message, 'error');
+                const gridElement = document.getElementById('resumeGrid');
+                if (gridElement) {
+                    gridElement.innerHTML = `
+                        <div style="grid-column: 1 / -1; text-align: center; padding: 60px;">
+                            <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
+                            <h3>数据加载失败</h3>
+                            <p>请检查API连接状态</p>
+                            <button class="action-btn" onclick="loadData()" style="margin-top: 20px;">重试</button>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function updateStats() {
+            const totalCount = allResumes.length;
+            const todayCount = Math.floor(Math.random() * 5);
+            const avgSkills = totalCount > 0 ? Math.round(
+                allResumes.reduce((sum, resume) =>
+                    sum + (resume.skills_objs ? resume.skills_objs.length : 0), 0) / totalCount
+            ) : 0;
+
+            const totalElement = document.getElementById('totalResumes');
+            const newElement = document.getElementById('newResumes');
+            const avgElement = document.getElementById('avgSkills');
+
+            if (totalElement) totalElement.textContent = totalCount;
+            if (newElement) newElement.textContent = todayCount;
+            if (avgElement) avgElement.textContent = avgSkills;
+        }
+
+        function renderResumeGrid() {
+            const grid = document.getElementById('resumeGrid');
+            if (!grid) return;
+
+            if (filteredResumes.length === 0) {
+                grid.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 60px;">
+                        <div style="font-size: 48px; margin-bottom: 20px;">📋</div>
+                        <h3>暂无简历数据</h3>
+                        <p>请上传简历或检查搜索条件</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = filteredResumes.map(resume => `
+                <div class="resume-card">
+                    <div class="card-header">
+                        <div class="avatar">
+                            ${resume.name ? resume.name.charAt(0) : 'U'}
+                        </div>
+                        <div class="card-info">
+                            <h3>${resume.name || '未知姓名'}</h3>
+                            <p>${resume.major || '专业待更新'}</p>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="info-row">
+                            <span class="info-label">邮箱:</span>
+                            <span class="info-value">${resume.email || '未提供'}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">电话:</span>
+                            <span class="info-value">${resume.phone || '未提供'}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">学校:</span>
+                            <span class="info-value">${resume.college || '未提供'}</span>
+                        </div>
+                        ${resume.skills_objs && resume.skills_objs.length > 0 ? `
+                            <div class="skills-tags">
+                                ${resume.skills_objs.slice(0, 3).map(skill =>
+                                    `<span class="skill-tag">${skill.skills_name}</span>`
+                                ).join('')}
+                                ${resume.skills_objs.length > 3 ?
+                                    `<span class="skill-tag">+${resume.skills_objs.length - 3}</span>` : ''}
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn-small primary" onclick="viewDetails('${resume._id}')">查看详情</button>
+                        <button class="btn-small" onclick="editResume('${resume._id}')">编辑</button>
+                        <button class="btn-small danger" onclick="deleteResume('${resume._id}')">删除</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateFilters() {
+            const skillFilter = document.getElementById('skillFilter');
+            const eduFilter = document.getElementById('eduFilter');
+
+            if (!skillFilter || !eduFilter) return;
+
+            const allSkills = new Set();
+            allResumes.forEach(resume => {
+                if (resume.skills_objs) {
+                    resume.skills_objs.forEach(skill => {
+                        allSkills.add(skill.skills_name);
+                    });
+                }
+            });
+
+            skillFilter.innerHTML = '<option value="">所有技能</option>' +
+                Array.from(allSkills).map(skill =>
+                    `<option value="${skill}">${skill}</option>`
+                ).join('');
+
+            const allEducation = new Set();
+            allResumes.forEach(resume => {
+                if (resume.college) {
+                    allEducation.add(resume.college);
+                }
+            });
+
+            eduFilter.innerHTML = '<option value="">所有学校</option>' +
+                Array.from(allEducation).slice(0, 20).map(edu =>
+                    `<option value="${edu}">${edu}</option>`
+                ).join('');
+        }
+
+        function handleSearch() {
+            const searchInput = document.getElementById('searchInput');
+            if (!searchInput) return;
+
+            const searchTerm = searchInput.value.toLowerCase();
+
+            if (!searchTerm) {
+                filteredResumes = [...allResumes];
+            } else {
+                filteredResumes = allResumes.filter(resume => {
+                    return (
+                        (resume.name && resume.name.toLowerCase().includes(searchTerm)) ||
+                        (resume.college && resume.college.toLowerCase().includes(searchTerm)) ||
+                        (resume.email && resume.email.toLowerCase().includes(searchTerm)) ||
+                        (resume.skills_objs && resume.skills_objs.some(skill =>
+                            skill.skills_name && skill.skills_name.toLowerCase().includes(searchTerm)
+                        ))
+                    );
+                });
+            }
+
+            renderResumeGrid();
+        }
+
+        // ============ 项目文件管理 ============
+        async function loadProjectFiles() {
+            if (!currentProject) {
+                showMessage('请先选择一个项目', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/projects/${currentProject}/files`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const files = await response.json();
+                currentProjectFiles = files;
+
+                // 调试信息：显示从API返回的文件信息
+                console.log('从API获取的项目文件信息:');
+                files.forEach((file, index) => {
+                    console.log(`文件 ${index + 1}:`, {
+                        original_filename: file.original_filename,
+                        filename: file.filename,
+                        file_id: file.file_id,
+                        size: file.size,
+                        mimetype: file.mimetype
+                    });
+                });
+
+                renderProjectFiles();
+
+                logger.info(`成功加载项目文件: ${files.length} 个`);
+
+            } catch (error) {
+                console.error('加载项目文件失败:', error);
+                showMessage('加载项目文件失败: ' + error.message, 'error');
+                currentProjectFiles = [];
+                renderProjectFiles();
+            }
+        }
+
+        function renderProjectFiles() {
+    const pageElement = document.getElementById('project-upload');
+    if (!pageElement) return;
+
+    let fileListContainer = pageElement.querySelector('.file-list-container');
+    if (!fileListContainer) {
+        fileListContainer = document.createElement('div');
+        fileListContainer.className = 'file-list-container';
+        pageElement.appendChild(fileListContainer);
+    }
+
+    const files = currentProjectFiles || [];
+    const project = allProjects.find(p => p._id === currentProject);
+    const projectName = project ? project.name : '当前项目';
+
+    if (files.length === 0) {
+        fileListContainer.innerHTML = `
+            <h3 style="margin-bottom: 10px;">${projectName}的文件</h3>
+            <p style="color: #666;">暂无文件</p>
+        `;
+        return;
+    }
+
+    fileListContainer.innerHTML = `
+        <h3 style="margin-bottom: 10px;">${projectName}的文件 (${files.length}个)</h3>
+        <div class="file-list">
+            ${files.map((file, index) => {
+                let displayName = '未知文件';
+                if (file.original_filename && file.original_filename.trim() !== '') {
+                    displayName = file.original_filename;
+                } else if (file.filename && file.filename.trim() !== '') {
+                    displayName = file.filename;
+                }
+
+                // 解析状态显示
+                const parseStatus = file.parse_status || 'pending';
+                const parseEnabled = file.parse_enabled !== false;
+
+                let statusBadge = '';
+                let statusColor = '';
+
+                switch(parseStatus) {
+                    case 'pending':
+                        statusBadge = '未解析';
+                        statusColor = '#666';
+                        break;
+                    case 'processing':
+                        statusBadge = '解析中';
+                        statusColor = '#1a73e8';
+                        break;
+                    case 'completed':
+                        statusBadge = '已解析';
+                        statusColor = '#34a853';
+                        break;
+                    case 'failed':
+                        statusBadge = '解析失败';
+                        statusColor = '#ea4335';
+                        break;
+                }
+
+                return `
+                <div class="file-card">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                        <div style="font-size: 24px;">${getFileIcon(file.mimetype)}</div>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 500; margin-bottom: 4px; word-break: break-all;" title="${displayName}">
+                                ${displayName}
+                            </div>
+                            <div style="font-size: 12px; color: #5f6368;">
+                                ${formatFileSize(file.size)} • ${formatDate(file.upload_date)}
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 12px; color: #5f6368;">启用解析:</span>
+                                    <label class="switch" style="position: relative; display: inline-block; width: 34px; height: 20px;border-radius: 20px;background: grey;">
+                                        <input type="checkbox" ${parseEnabled ? 'checked' : ''} onchange="toggleParseEnabled('${file.file_id}', this.checked)">
+                                        <span class="slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; transition: .4s; border-radius: 20px;"></span>
+                                    </label>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 4px;">
+                                    <span style="font-size: 12px; color: #5f6368;">解析状态:</span>
+                                    <span style="font-size: 12px; color: ${statusColor}; font-weight: 500;">${statusBadge}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-small primary" onclick="parseFile('${file.file_id}', '${displayName.replace(/'/g, "\\'")}')">
+                            ${parseStatus === 'processing' ? '解析中...' : '解析'}
+                        </button>
+                        <button class="btn-small primary" onclick="downloadFile('${file.file_id}', '${displayName.replace(/'/g, "\\'")}')">
+                            下载
+                        </button>
+                        <button class="btn-small danger" onclick="deleteProjectFile('${file.file_id}', '${displayName.replace(/'/g, "\\'")}')">
+                            删除
+                        </button>
+                    </div>
+                </div>
+            `}).join('')}
+        </div>
+    `;
+}
+
+// 添加切换解析状态的函数
+async function toggleParseEnabled(fileId, enabled) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/files/${fileId}/parse-status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                parse_enabled: enabled
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showMessage(`解析状态已${enabled ? '启用' : '禁用'}`, 'success');
+            await loadProjectFiles(); // 刷新文件列表
+        } else {
+            showMessage(result.error || '更新失败', 'error');
+        }
+    } catch (error) {
+        console.error('更新解析状态失败:', error);
+        showMessage('更新解析状态失败: ' + error.message, 'error');
+    }
+}
+
+// 添加解析文件的函数
+async function parseFile(fileId, filename) {
+    try {
+        showMessage(`开始解析文件: ${filename}`, 'info');
+        // 调用后端解析API
+        const response = await fetch(`${API_BASE_URL}/files/${fileId}/parse`, {
+            method: 'POST',
+        });
+        const result = await response.json();
+        if (response.ok) {
+            showMessage(`文件解析完成: ${filename}`, 'success');
+        } else {
+            showMessage(result.error || '解析失败', 'error');
+        }
+        await loadProjectFiles(); // 刷新显示
+    } catch (error) {
+        console.error('解析文件失败:', error);
+        showMessage('解析文件失败: ' + error.message, 'error');
+    }
+}
+
+        async function uploadProjectFiles(files) {
+            if (!currentProject) {
+                showMessage('请先选择一个项目', 'error');
+                return false;
+            }
+
+            try {
+                const formData = new FormData();
+
+                // 添加调试信息：显示要上传的文件
+                console.log('=== 准备上传项目文件 ===');
+                for (let i = 0; i < files.length; i++) {
+                    formData.append('files', files[i]);
+                    console.log(`上传文件 ${i + 1}: "${files[i].name}" (${formatFileSize(files[i].size)})`);
+                }
+
+                showUploadProgress('project', true);
+
+                const response = await fetch(`${API_BASE_URL}/projects/${currentProject}/files`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                // 添加调试信息：显示服务器返回结果
+                console.log('=== 服务器上传响应 ===');
+                console.log('响应状态:', response.status);
+                console.log('响应数据:', result);
+
+                showUploadProgress('project', false);
+
+                if (response.ok) {
+                    const successCount = result.uploaded_files ? result.uploaded_files.length : 0;
+                    let message = `成功上传 ${successCount} 个文件到项目`;
+
+                    if (result.project_name) {
+                        message += `: ${result.project_name}`;
+                    }
+
+                    // 显示每个上传文件的详细信息
+                    if (result.uploaded_files) {
+                        console.log('=== 上传成功的文件详情 ===');
+                        result.uploaded_files.forEach((file, index) => {
+                            console.log(`文件 ${index + 1}:`, {
+                                original_filename: file.original_filename,
+                                filename: file.filename,
+                                file_id: file.file_id,
+                                size: file.size
+                            });
+                        });
+                    }
+
+                    if (result.errors && result.errors.length > 0) {
+                        message += `，${result.errors.length} 个文件失败`;
+                        console.warn('上传错误:', result.errors);
+                    }
+
+                    showMessage(message, 'success');
+
+                    // 重新加载项目文件列表
+                    await loadProjectFiles();
+
+                    return true;
+                } else {
+                    console.error('上传失败:', result);
+                    showMessage(result.error || '文件上传失败', 'error');
+                    return false;
+                }
+
+            } catch (error) {
+                showUploadProgress('project', false);
+                console.error('文件上传失败:', error);
+                showMessage('文件上传失败: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        async function deleteProjectFile(fileId, filename) {
+            try {
+                if (!confirm(`确定要删除文件 "${filename}" 吗？`)) {
+                    return;
+                }
+
+                const response = await fetch(`${API_BASE_URL}/files/${fileId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(`文件 "${filename}" 删除成功`, 'success');
+
+                    // 重新加载项目文件列表
+                    await loadProjectFiles();
+                } else {
+                    showMessage(result.error || '删除文件失败', 'error');
+                }
+
+            } catch (error) {
+                console.error('删除文件失败:', error);
+                showMessage('删除文件失败: ' + error.message, 'error');
+            }
+        }
+
+        // ============ 分类文件管理 ============
+        async function loadCategoryFiles(category) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/files/category/${category}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const files = await response.json();
+                currentCategoryFiles[category] = files;
+
+                // 调试信息：显示从API返回的文件信息
+                console.log(`从API获取的${FILE_CATEGORIES[category]}文件信息:`);
+                files.forEach((file, index) => {
+                    console.log(`文件 ${index + 1}:`, {
+                        original_filename: file.original_filename,
+                        filename: file.filename,
+                        file_id: file.file_id,
+                        size: file.size,
+                        mimetype: file.mimetype
+                    });
+                });
+
+                renderCategoryFiles(category);
+
+                logger.info(`成功加载 ${category} 类别文件: ${files.length} 个`);
+
+            } catch (error) {
+                console.error(`加载 ${category} 文件失败:`, error);
+                showMessage(`加载${FILE_CATEGORIES[category]}文件失败: ` + error.message, 'error');
+                currentCategoryFiles[category] = [];
+            }
+        }
+
+        function renderCategoryFiles(category) {
+            const pageElement = document.getElementById(`upload-${category}`);
+            if (!pageElement) return;
+
+            let fileListContainer = pageElement.querySelector('.file-list-container');
+            if (!fileListContainer) {
+                fileListContainer = document.createElement('div');
+                fileListContainer.className = 'file-list-container';
+                pageElement.appendChild(fileListContainer);
+            }
+
+            const files = currentCategoryFiles[category] || [];
+            const categoryName = FILE_CATEGORIES[category];
+
+            if (files.length === 0) {
+                fileListContainer.innerHTML = `
+                    <h3 style="margin-bottom: 10px;">已上传的${categoryName}文件</h3>
+                    <p style="color: #666;">暂无${categoryName}文件</p>
+                `;
+                return;
+            }
+
+            console.log(`=== 渲染${categoryName}文件列表 ===`);
+            fileListContainer.innerHTML = `
+                <h3 style="margin-bottom: 10px;">已上传的${categoryName}文件 (${files.length}个)</h3>
+                <div class="file-list">
+                    ${files.map((file, index) => {
+                        // 更详细的文件名处理逻辑
+                        let displayName = '未知文件';
+
+                        if (file.original_filename && file.original_filename.trim() !== '') {
+                            displayName = file.original_filename;
+                        } else if (file.filename && file.filename.trim() !== '') {
+                            displayName = file.filename;
+                        }
+
+                        // 调试信息
+                        console.log(`渲染${categoryName}文件 ${index + 1}:`, {
+                            original_filename: file.original_filename,
+                            filename: file.filename,
+                            displayName: displayName,
+                            file_id: file.file_id
+                        });
+
+                        return `
+                        <div class="file-card">
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                                <div style="font-size: 24px;">${getFileIcon(file.mimetype)}</div>
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 500; margin-bottom: 4px; word-break: break-all;" title="${displayName}">
+                                        ${displayName}
+                                    </div>
+                                    <div style="font-size: 12px; color: #5f6368;">
+                                        ${formatFileSize(file.size)} • ${formatDate(file.upload_date)}
+                                    </div>
+                                    ${file.original_filename && file.filename && file.original_filename !== file.filename ? `
+                                        <div style="font-size: 10px; color: #888; margin-top: 2px;">
+                                            存储为: ${file.filename}
+                                        </div>
+                                    ` : ''}
+                                    <!-- 调试信息显示 -->
+                                    <div style="font-size: 9px; color: #ccc; margin-top: 1px;">
+                                        ID: ${file.file_id} | Original: ${file.original_filename || 'null'} | Storage: ${file.filename || 'null'}
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn-small primary" onclick="downloadFile('${file.file_id}', '${displayName.replace(/'/g, "\\'")}')">
+                                    下载
+                                </button>
+                                <button class="btn-small danger" onclick="deleteFile('${file.file_id}', '${displayName.replace(/'/g, "\\'")}', '${category}')">
+                                    删除
+                                </button>
+                            </div>
+                        </div>
+                    `}).join('')}
+                </div>
+            `;
+        }
+
+        async function uploadCategoryFiles(files, category) {
+            try {
+                const formData = new FormData();
+
+                // 添加调试信息：显示要上传的文件
+                console.log(`=== 准备上传${FILE_CATEGORIES[category]}文件 ===`);
+                for (let i = 0; i < files.length; i++) {
+                    formData.append('files', files[i]);
+                    console.log(`上传文件 ${i + 1}: "${files[i].name}" (${formatFileSize(files[i].size)})`);
+                }
+
+                showUploadProgress(category, true);
+
+                const response = await fetch(`${API_BASE_URL}/files/category/${category}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                // 添加调试信息：显示服务器返回结果
+                console.log(`=== ${FILE_CATEGORIES[category]}上传响应 ===`);
+                console.log('响应状态:', response.status);
+                console.log('响应数据:', result);
+
+                showUploadProgress(category, false);
+
+                if (response.ok) {
+                    const successCount = result.uploaded_files ? result.uploaded_files.length : 0;
+                    let message = `成功上传 ${successCount} 个文件到${FILE_CATEGORIES[category]}`;
+
+                    // 显示每个上传文件的详细信息
+                    if (result.uploaded_files) {
+                        console.log(`=== ${FILE_CATEGORIES[category]}上传成功的文件详情 ===`);
+                        result.uploaded_files.forEach((file, index) => {
+                            console.log(`文件 ${index + 1}:`, {
+                                original_filename: file.original_filename,
+                                filename: file.filename,
+                                file_id: file.file_id,
+                                size: file.size
+                            });
+                        });
+                    }
+
+                    if (result.errors && result.errors.length > 0) {
+                        message += `，${result.errors.length} 个文件失败`;
+                        console.warn('上传错误:', result.errors);
+                    }
+
+                    showMessage(message, 'success');
+
+                    // 重新加载文件列表
+                    await loadCategoryFiles(category);
+
+                    return true;
+                } else {
+                    console.error('上传失败:', result);
+                    showMessage(result.error || '文件上传失败', 'error');
+                    return false;
+                }
+
+            } catch (error) {
+                showUploadProgress(category, false);
+                console.error('文件上传失败:', error);
+                showMessage('文件上传失败: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        function showUploadProgress(category, show) {
+            const progressElement = document.getElementById(`uploadProgress-${category}`);
+            if (progressElement) {
+                progressElement.style.display = show ? 'block' : 'none';
+            }
+        }
+
+        function getFileIcon(mimetype) {
+            if (!mimetype) return '📄';
+
+            if (mimetype.startsWith('image/')) return '🖼️';
+            if (mimetype.startsWith('video/')) return '🎥';
+            if (mimetype.startsWith('audio/')) return '🎵';
+            if (mimetype.includes('pdf')) return '📑';
+            if (mimetype.includes('word') || mimetype.includes('document')) return '📝';
+            if (mimetype.includes('excel') || mimetype.includes('spreadsheet')) return '📊';
+            if (mimetype.includes('powerpoint') || mimetype.includes('presentation')) return '📈';
+            if (mimetype.includes('zip') || mimetype.includes('rar') || mimetype.includes('7z')) return '🗜️';
+            if (mimetype.includes('text')) return '📄';
+
+            return '📄';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function formatDate(dateString) {
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleDateString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch (error) {
+                return dateString;
+            }
+        }
+
+        async function downloadFile(fileId, filename) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/files/${fileId}/download`);
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || '下载失败');
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+
+                showMessage(`文件 "${filename}" 下载完成`, 'success');
+
+            } catch (error) {
+                console.error('文件下载失败:', error);
+                showMessage('文件下载失败: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteFile(fileId, filename, category) {
+            try {
+                if (!confirm(`确定要删除文件 "${filename}" 吗？`)) {
+                    return;
+                }
+
+                const response = await fetch(`${API_BASE_URL}/files/${fileId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(`文件 "${filename}" 删除成功`, 'success');
+
+                    // 重新加载文件列表
+                    if (category) {
+                        await loadCategoryFiles(category);
+                    }
+                } else {
+                    showMessage(result.error || '删除文件失败', 'error');
+                }
+
+            } catch (error) {
+                console.error('删除文件失败:', error);
+                showMessage('删除文件失败: ' + error.message, 'error');
+            }
+        }
+
+        // ============ 文件上传处理 ============
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('dragover');
+        }
+
+        function handleDrop(e, category) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            handleFiles(files, category);
+        }
+
+        function handleFileSelect(e, category) {
+            const files = e.target.files;
+            handleFiles(files, category);
+        }
+
+        function handleFiles(files, category) {
+            if (files.length === 0) return;
+
+            // 检查文件数量
+            if (files.length > 50) {
+                showMessage('一次最多上传50个文件', 'error');
+                return;
+            }
+
+            // 检查文件大小
+            const maxSize = 100 * 1024 * 1024; // 100MB
+            const oversizedFiles = [];
+
+            for (let i = 0; i < files.length; i++) {
+                if (files[i].size > maxSize) {
+                    oversizedFiles.push(files[i].name);
+                }
+            }
+
+            if (oversizedFiles.length > 0) {
+                showMessage(`以下文件过大（超过100MB）：${oversizedFiles.join(', ')}`, 'error');
+                return;
+            }
+
+            // 调试信息：显示文件原始名称
+            console.log('准备上传的文件:');
+            for (let i = 0; i < files.length; i++) {
+                console.log(`文件 ${i + 1}: ${files[i].name} (${formatFileSize(files[i].size)})`);
+            }
+
+            // 根据类别上传文件
+            if (category === 'project') {
+                uploadProjectFiles(files);
+            } else {
+                uploadCategoryFiles(files, category);
+            }
+        }
+
+        function viewDetails(id) {
+            const resume = allResumes.find(r => r._id === id);
+            if (!resume) return;
+
+            document.getElementById('modalTitle').textContent = `${resume.name || '未知姓名'} - 详细信息`;
+            document.getElementById('modalBody').innerHTML = generateDetailHTML(resume);
+            document.getElementById('detailModal').style.display = 'flex';
+        }
+
+        function generateDetailHTML(resume) {
+            return `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px;">
+                    <div>
+                        <h4 style="margin-bottom: 15px; color: #1a73e8;">基本信息</h4>
+                        <div class="info-row"><strong>姓名:</strong> ${resume.name || 'N/A'}</div>
+                        <div class="info-row"><strong>性别:</strong> ${resume.gender || 'N/A'}</div>
+                        <div class="info-row"><strong>年龄:</strong> ${resume.age || 'N/A'}</div>
+                        <div class="info-row"><strong>邮箱:</strong> ${resume.email || 'N/A'}</div>
+                        <div class="info-row"><strong>电话:</strong> ${resume.phone || 'N/A'}</div>
+                        <div class="info-row"><strong>地址:</strong> ${resume.living_address || 'N/A'}</div>
+                    </div>
+                    <div>
+                        <h4 style="margin-bottom: 15px; color: #1a73e8;">教育背景</h4>
+                        <div class="info-row"><strong>学校:</strong> ${resume.college || 'N/A'}</div>
+                        <div class="info-row"><strong>专业:</strong> ${resume.major || 'N/A'}</div>
+                        <div class="info-row"><strong>学历:</strong> ${resume.education || 'N/A'}</div>
+                    </div>
+                </div>
+
+                ${resume.skills_objs && resume.skills_objs.length > 0 ? `
+                    <div style="margin-bottom: 30px;">
+                        <h4 style="margin-bottom: 15px; color: #1a73e8;">技能列表</h4>
+                        <div class="skills-tags">
+                            ${resume.skills_objs.map(skill =>
+                                `<span class="skill-tag">${skill.skills_name} - ${skill.skills_level || ''}</span>`
+                            ).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${resume.job_exp_objs && resume.job_exp_objs.length > 0 ? `
+                    <div style="margin-bottom: 30px;">
+                        <h4 style="margin-bottom: 15px; color: #1a73e8;">工作经历</h4>
+                        ${resume.job_exp_objs.map(job => `
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                                <div style="font-weight: 600;">${job.job_position} @ ${job.job_cpy}</div>
+                                <div style="color: #5f6368; margin: 5px 0;">${job.start_date} - ${job.end_date}</div>
+                                <div style="line-height: 1.6;">${job.job_content || ''}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        function editResume(id) {
+            showMessage('编辑功能开发中...', 'info');
+        }
+
+        function deleteResume(id) {
+            if (confirm('确定要删除这份简历吗？')) {
+                showMessage('删除功能开发中...', 'info');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').style.display = 'none';
+        }
+
+        function showProjectManager() {
+            renderProjectManagerList();
+            document.getElementById('projectManagerModal').style.display = 'flex';
+        }
+
+        function closeProjectManager() {
+            document.getElementById('projectManagerModal').style.display = 'none';
+            document.getElementById('newProjectNameInput').value = '';
+            document.getElementById('newProjectDescInput').value = '';
+        }
+
+        function renderProjectManagerList() {
+            const listContainer = document.getElementById('projectManagerList');
+            if (!listContainer) return;
+
+            if (allProjects.length === 0) {
+                listContainer.innerHTML = '<p style="color: #666; text-align: center; padding: 20px;">暂无项目</p>';
+                return;
+            }
+
+            listContainer.innerHTML = allProjects.map(project => `
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px; border: 1px solid #e8eaed; border-radius: 6px; margin-bottom: 8px; ${project._id === currentProject ? 'background: #e8f0fe; border-color: #1a73e8;' : ''}">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 500; margin-bottom: 2px;">${project.name}</div>
+                        <div style="font-size: 12px; color: #5f6368;">${project.description || '暂无描述'}</div>
+                        <div style="font-size: 11px; color: #5f6368; margin-top: 2px;">创建时间: ${formatDate(project.created_at)}</div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        ${project._id === currentProject ? '<span style="color: #1a73e8; font-size: 12px; margin-right: 8px;">当前</span>' : ''}
+                        <button class="btn-small" onclick="switchProject('${project._id}')" ${project._id === currentProject ? 'disabled' : ''}>
+                            ${project._id === currentProject ? '已选择' : '选择'}
+                        </button>
+                        <button class="btn-small danger" onclick="deleteProject('${project._id}')">删除</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function createProjectFromModal() {
+            const nameInput = document.getElementById('newProjectNameInput');
+            const descInput = document.getElementById('newProjectDescInput');
+
+            const name = nameInput.value.trim();
+            const description = descInput.value.trim();
+
+            if (!name) {
+                showMessage('请输入项目名称', 'error');
+                nameInput.focus();
+                return;
+            }
+
+            const success = await createProject(name, description);
+            if (success) {
+                nameInput.value = '';
+                descInput.value = '';
+                renderProjectManagerList();
+            }
+        }
+
+        async function deleteProject(projectId) {
+            try {
+                const project = allProjects.find(p => p._id === projectId);
+                const projectName = project ? project.name : '项目';
+
+                if (!confirm(`确定要删除项目 "${projectName}" 吗？\n\n删除后将同时删除项目中的所有文件，此操作不可恢复。`)) {
+                    return false;
+                }
+
+                const response = await fetch(`${API_BASE_URL}/projects/${projectId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(`项目 "${projectName}" 删除成功`, 'success');
+
+                    if (currentProject === projectId) {
+                        currentProject = null;
+                    }
+
+                    await loadProjects();
+
+                    if (allProjects.length > 0) {
+                        switchProject(allProjects[0]._id);
+                    } else {
+                        currentProject = null;
+                        switchPage('dashboard');
+                    }
+
+                    return true;
+                } else {
+                    showMessage(result.error || '删除项目失败', 'error');
+                    return false;
+                }
+
+            } catch (error) {
+                console.error('删除项目失败:', error);
+                showMessage('删除项目失败: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        async function testConnection() {
+            try {
+                showMessage('正在测试连接...', 'info');
+                const response = await fetch(`${API_BASE_URL}/health`);
+
+                if (response.ok) {
+                    showMessage('API连接正常', 'success');
+                } else {
+                    showMessage('API连接失败', 'error');
+                }
+            } catch (error) {
+                showMessage('连接测试失败: ' + error.message, 'error');
+            }
+        }
+
+        async function testAllEndpoints() {
+            const endpoints = [
+                { url: `${API_BASE_URL}/health`, name: '健康检查' },
+                { url: `${API_BASE_URL}/resume/all`, name: '获取所有简历' },
+                { url: `${API_BASE_URL}/resume/latest`, name: '获取最新简历' },
+                { url: `${API_BASE_URL}/projects`, name: '获取项目列表' },
+                { url: `${API_BASE_URL}/system/info`, name: '系统信息' }
+            ];
+
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await fetch(endpoint.url);
+                    const status = response.ok ? '✅' : '❌';
+                    showMessage(`${status} ${endpoint.name}: ${response.status}`, response.ok ? 'success' : 'error');
+                } catch (error) {
+                    showMessage(`❌ ${endpoint.name}: 连接失败`, 'error');
+                }
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+
+        async function getSystemInfo() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/system/info`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    let infoHtml = `
+                        <h4>系统信息</h4>
+                        <div class="info-row"><strong>数据目录:</strong> ${data.data_directory}</div>
+                        <div class="info-row"><strong>项目数量:</strong> ${data.project_count}</div>
+                        <div class="info-row"><strong>项目文件数:</strong> ${data.project_file_count}</div>
+                        <div class="info-row"><strong>磁盘使用:</strong> ${data.total_disk_usage_mb} MB</div>
+                        <br>
+                        <h4>文件分类统计</h4>
+                    `;
+
+                    Object.entries(data.file_categories).forEach(([category, info]) => {
+                        infoHtml += `<div class="info-row"><strong>${info.name}:</strong> ${info.count} 个文件</div>`;
+                    });
+
+                    document.getElementById('modalTitle').textContent = '系统信息';
+                    document.getElementById('modalBody').innerHTML = infoHtml;
+                    document.getElementById('detailModal').style.display = 'flex';
+                } else {
+                    showMessage('获取系统信息失败', 'error');
+                }
+            } catch (error) {
+                showMessage('获取系统信息失败: ' + error.message, 'error');
+            }
+        }
+
+        async function refreshData() {
+            await loadData();
+            updateStats();
+
+            // 刷新当前页面的文件列表
+            if (currentPage.startsWith('upload-')) {
+                const category = currentPage.replace('upload-', '');
+                if (FILE_CATEGORIES[category]) {
+                    loadCategoryFiles(category);
+                }
+            } else if (currentPage === 'project-upload') {
+                loadProjectFiles();
+            }
+        }
+
+        function exportData() {
+            const dataStr = JSON.stringify(filteredResumes, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `简历数据_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            showMessage('数据导出成功', 'success');
+        }
+
+        function loadResumeManagement() {
+            const managementGrid = document.getElementById('resumeManagementGrid');
+            const originalGrid = document.getElementById('resumeGrid');
+            if (managementGrid && originalGrid) {
+                managementGrid.innerHTML = originalGrid.innerHTML;
+            }
+        }
+
+        async function checkConnectionStatus() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                const statusElement = document.getElementById('connectionStatus');
+
+                if (statusElement) {
+                    if (response.ok) {
+                        statusElement.textContent = '✅ 连接正常';
+                        statusElement.style.color = '#34a853';
+                    } else {
+                        statusElement.textContent = '❌ 连接异常';
+                        statusElement.style.color = '#ea4335';
+                    }
+                }
+            } catch (error) {
+                const statusElement = document.getElementById('connectionStatus');
+                if (statusElement) {
+                    statusElement.textContent = '❌ 连接失败';
+                    statusElement.style.color = '#ea4335';
+                }
+            }
+        }
+
+        function showMessage(message, type) {
+            const messageElement = document.getElementById('statusMessage');
+            messageElement.textContent = message;
+            messageElement.className = `status-message ${type} show`;
+
+            setTimeout(() => {
+                messageElement.classList.remove('show');
+            }, 3000);
+        }
+
+        // 键盘快捷键
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+            if (e.ctrlKey && e.key === 'r') {
+                e.preventDefault();
+                refreshData();
+            }
+        });
+    </script>
+</body>
+</html>
