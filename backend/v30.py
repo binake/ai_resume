@@ -159,8 +159,22 @@ class MongoDBClient:
             for document in cursor:
                 if "data" in document and "result" in document["data"]:
                     result_data = document["data"]["result"]
+                    
+                    # 调试信息：检查原始数据
+                    if "skills_objs" in result_data:
+                        logger.info(f"原始 skills_objs: {type(result_data['skills_objs'])} - {result_data['skills_objs']}")
+                    if "job_exp_objs" in result_data:
+                        logger.info(f"原始 job_exp_objs: {type(result_data['job_exp_objs'])} - {result_data['job_exp_objs']}")
+                    
                     # 处理编码
                     result_data = self.ensure_utf8_encoding(result_data)
+                    
+                    # 调试信息：检查编码处理后的数据
+                    if "skills_objs" in result_data:
+                        logger.info(f"编码处理后 skills_objs: {type(result_data['skills_objs'])} - {result_data['skills_objs']}")
+                    if "job_exp_objs" in result_data:
+                        logger.info(f"编码处理后 job_exp_objs: {type(result_data['job_exp_objs'])} - {result_data['job_exp_objs']}")
+                    
                     # 添加MongoDB的_id字段
                     result_data["_id"] = str(document["_id"])
                     results.append(result_data)
@@ -564,6 +578,27 @@ def get_resume_by_id(record_id):
     except Exception as e:
         logger.error(f"API错误: {e}")
         return create_json_response({"error": "服务器内部错误"}, 500)
+
+
+@app.route('/api/resume/<record_id>', methods=['PUT'])
+def update_resume(record_id):
+    """更新指定简历数据，支持动态字段结构"""
+    try:
+        data = request.get_json()
+        if not data:
+            return create_json_response({"error": "请求数据为空"}, 400)
+        # 直接更新 data.result 字段，支持任意结构
+        result = mongo_client.collection.update_one(
+            {"_id": ObjectId(record_id)},
+            {"$set": {"data.result": data, "updated_at": datetime.now()}}
+        )
+        if result.matched_count > 0:
+            return create_json_response({"message": "更新成功"})
+        else:
+            return create_json_response({"error": "未找到指定简历"}, 404)
+    except Exception as e:
+        logger.error(f"简历更新失败: {e}")
+        return create_json_response({"error": "服务器内部错误", "detail": str(e)}, 500)
 
 
 @app.route('/api/resume', methods=['POST'])

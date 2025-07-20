@@ -512,6 +512,30 @@
         let currentCategoryFiles = {}; // 存储各类别的文件列表
         let currentProjectFiles = []; // 存储当前项目的文件列表
 
+        // 字段分组定义 - 按照用户提供的JSON结构重新定义
+        const FIELD_GROUPS = {
+            'profile': ['name', 'email', 'phone', 'mobile', 'github', 'zhihu', 'workExpYear', 'living_address', 'birthday', 'hometown_address', 'race', 'surname', 'hukou_address', 'city', 'gender', 'age'],
+            'educationList': ['college', 'major', 'education', 'degree', 'college_type', 'college_rank', 'grad_time'],
+            'workExpList': ['work_year', 'work_year_inf', 'work_start_time', 'work_start_time_inf', 'work_position', 'work_position_p', 'work_company', 'expect_job'],
+            'projectList': ['project_name', 'project_role', 'project_time', 'project_desc', 'project_content'],
+            'skillList': ['skills_objs'],
+            'awardList': ['award_info', 'award_time'],
+            'workList': ['work_name', 'work_desc', 'work_link'],
+            'aboutme': ['aboutme_desc', 'self_introduction']
+        };
+
+        // 分组名称映射（用于显示中文名称）
+        const GROUP_NAME_MAP = {
+            'profile': '基本信息',
+            'educationList': '教育背景',
+            'workExpList': '工作经历',
+            'projectList': '项目经验',
+            'skillList': '个人技能',
+            'awardList': '更多信息',
+            'workList': '个人作品',
+            'aboutme': '个人评价'
+        };
+
         // 文件类别映射
         const FILE_CATEGORIES = {
             'resume': '个人简历',
@@ -847,6 +871,26 @@
                 }
 
                 const data = await response.json();
+                
+                // 调试信息：检查API返回的原始数据
+                console.log('API返回的原始数据:', data);
+                if (data.length > 0) {
+                    const firstResume = data[0];
+                    console.log('第一条简历数据:', firstResume);
+                    console.log('skills_objs 字段:', {
+                        value: firstResume.skills_objs,
+                        type: typeof firstResume.skills_objs,
+                        isArray: Array.isArray(firstResume.skills_objs),
+                        isObject: typeof firstResume.skills_objs === 'object' && firstResume.skills_objs !== null
+                    });
+                    console.log('job_exp_objs 字段:', {
+                        value: firstResume.job_exp_objs,
+                        type: typeof firstResume.job_exp_objs,
+                        isArray: Array.isArray(firstResume.job_exp_objs),
+                        isObject: typeof firstResume.job_exp_objs === 'object' && firstResume.job_exp_objs !== null
+                    });
+                }
+                
                 allResumes = data;
                 filteredResumes = [...allResumes];
 
@@ -903,7 +947,10 @@
                 return;
             }
 
-            grid.innerHTML = filteredResumes.map(resume => `
+            grid.innerHTML = filteredResumes.map(resume => {
+                // 健壮性处理：skills_objs 必须为数组
+                const skills = Array.isArray(resume.skills_objs) ? resume.skills_objs : [];
+                return `
                 <div class="resume-card">
                     <div class="card-header">
                         <div class="avatar">
@@ -927,13 +974,13 @@
                             <span class="info-label">学校:</span>
                             <span class="info-value">${resume.college || '未提供'}</span>
                         </div>
-                        ${resume.skills_objs && resume.skills_objs.length > 0 ? `
+                            ${skills.length > 0 ? `
                             <div class="skills-tags">
-                                ${resume.skills_objs.slice(0, 3).map(skill =>
+                                    ${skills.slice(0, 3).map(skill =>
                                     `<span class="skill-tag">${skill.skills_name}</span>`
                                 ).join('')}
-                                ${resume.skills_objs.length > 3 ?
-                                    `<span class="skill-tag">+${resume.skills_objs.length - 3}</span>` : ''}
+                                    ${skills.length > 3 ?
+                                        `<span class="skill-tag">+${skills.length - 3}</span>` : ''}
                             </div>
                         ` : ''}
                     </div>
@@ -943,7 +990,8 @@
                         <button class="btn-small danger" onclick="deleteResume('${resume._id}')">删除</button>
                     </div>
                 </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         function updateFilters() {
@@ -954,11 +1002,10 @@
 
             const allSkills = new Set();
             allResumes.forEach(resume => {
-                if (resume.skills_objs) {
-                    resume.skills_objs.forEach(skill => {
+                const skills = Array.isArray(resume.skills_objs) ? resume.skills_objs : [];
+                skills.forEach(skill => {
                         allSkills.add(skill.skills_name);
                     });
-                }
             });
 
             skillFilter.innerHTML = '<option value="">所有技能</option>' +
@@ -1184,11 +1231,11 @@ async function parseFile(fileId, filename) {
         });
         const result = await response.json();
         if (response.ok) {
-            showMessage(`文件解析完成: ${filename}`, 'success');
+                showMessage(`文件解析完成: ${filename}`, 'success');
         } else {
             showMessage(result.error || '解析失败', 'error');
         }
-        await loadProjectFiles(); // 刷新显示
+                await loadProjectFiles(); // 刷新显示
     } catch (error) {
         console.error('解析文件失败:', error);
         showMessage('解析文件失败: ' + error.message, 'error');
@@ -1653,59 +1700,512 @@ async function parseFile(fileId, filename) {
             const resume = allResumes.find(r => r._id === id);
             if (!resume) return;
 
-            document.getElementById('modalTitle').textContent = `${resume.name || '未知姓名'} - 详细信息`;
-            document.getElementById('modalBody').innerHTML = generateDetailHTML(resume);
+            // 左右分栏布局：左侧预览，右侧操作
+            const modalContent = `
+                <div style="display: flex; gap: 20px; height: 80vh;">
+                    <!-- 左侧预览区域 -->
+                    <div style="flex: 1; overflow-y: auto; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                        <div style="background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            ${generateResumePreview(resume)}
+                        </div>
+                    </div>
+                    <!-- 右侧操作区域 -->
+                    <div style="width: 300px; display: flex; flex-direction: column; gap: 15px;">
+                        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <h4 style="margin-bottom: 15px; color: #1a73e8;">操作</h4>
+                            <button class="action-btn" onclick="editResume('${id}')" style="width: 100%; margin-bottom: 10px;">✏️ 编辑简历</button>
+                            <button class="action-btn secondary" onclick="exportResume('${id}')" style="width: 100%; margin-bottom: 10px;">📄 导出数据</button>
+                            <button class="action-btn danger" onclick="deleteResume('${id}')" style="width: 100%;">🗑️ 删除简历</button>
+                        </div>
+                        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <h4 style="margin-bottom: 15px; color: #1a73e8;">字段统计</h4>
+                            <div style="font-size: 14px; color: #5f6368;">
+                                <div>总字段数: ${Object.keys(resume).length}</div>
+                                <div>基本信息: ${Object.keys(resume).filter(k => FIELD_GROUPS['profile'].includes(k)).length}</div>
+                                <div>教育背景: ${Object.keys(resume).filter(k => FIELD_GROUPS['educationList'].includes(k)).length}</div>
+                                <div>工作经历: ${Object.keys(resume).filter(k => FIELD_GROUPS['workExpList'].includes(k)).length}</div>
+                                <div>项目经验: ${Object.keys(resume).filter(k => FIELD_GROUPS['projectList'].includes(k)).length}</div>
+                                <div>个人技能: ${Object.keys(resume).filter(k => FIELD_GROUPS['skillList'].includes(k)).length}</div>
+                                <div>更多信息: ${Object.keys(resume).filter(k => FIELD_GROUPS['awardList'].includes(k)).length}</div>
+                                <div>个人作品: ${Object.keys(resume).filter(k => FIELD_GROUPS['workList'].includes(k)).length}</div>
+                                <div>个人评价: ${Object.keys(resume).filter(k => FIELD_GROUPS['aboutme'].includes(k)).length}</div>
+                                <div>自定义字段: ${Object.keys(resume).filter(k => !Object.values(FIELD_GROUPS).flat().includes(k)).length}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('modalTitle').textContent = `${resume.name || '未知姓名'} - 简历详情`;
+            document.getElementById('modalBody').innerHTML = modalContent;
             document.getElementById('detailModal').style.display = 'flex';
         }
 
-        function generateDetailHTML(resume) {
+        // 生成简历预览（参考 visiky 设计，按照新的JSON结构）
+        function generateResumePreview(resume) {
             return `
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px;">
-                    <div>
-                        <h4 style="margin-bottom: 15px; color: #1a73e8;">基本信息</h4>
-                        <div class="info-row"><strong>姓名:</strong> ${resume.name || 'N/A'}</div>
-                        <div class="info-row"><strong>性别:</strong> ${resume.gender || 'N/A'}</div>
-                        <div class="info-row"><strong>年龄:</strong> ${resume.age || 'N/A'}</div>
-                        <div class="info-row"><strong>邮箱:</strong> ${resume.email || 'N/A'}</div>
-                        <div class="info-row"><strong>电话:</strong> ${resume.phone || 'N/A'}</div>
-                        <div class="info-row"><strong>地址:</strong> ${resume.living_address || 'N/A'}</div>
+                <!-- 个人信息头部 -->
+                <div style="text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #e8eaed;">
+                    <div style="width: 80px; height: 80px; border-radius: 50%; background: #1a73e8; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; color: white; font-size: 24px; font-weight: bold;">
+                        ${resume.name ? resume.name.charAt(0) : 'U'}
                     </div>
-                    <div>
-                        <h4 style="margin-bottom: 15px; color: #1a73e8;">教育背景</h4>
-                        <div class="info-row"><strong>学校:</strong> ${resume.college || 'N/A'}</div>
-                        <div class="info-row"><strong>专业:</strong> ${resume.major || 'N/A'}</div>
-                        <div class="info-row"><strong>学历:</strong> ${resume.education || 'N/A'}</div>
+                    <h2 style="margin-bottom: 10px; color: #202124;">${resume.name || '姓名未填写'}</h2>
+                    <div style="display: flex; justify-content: center; gap: 20px; color: #5f6368; font-size: 14px;">
+                        ${resume.phone || resume.mobile ? `<span>📞 ${resume.phone || resume.mobile}</span>` : ''}
+                        ${resume.email ? `<span>📧 ${resume.email}</span>` : ''}
+                        ${resume.living_address ? `<span>📍 ${resume.living_address}</span>` : ''}
                     </div>
                 </div>
 
-                ${resume.skills_objs && resume.skills_objs.length > 0 ? `
-                    <div style="margin-bottom: 30px;">
-                        <h4 style="margin-bottom: 15px; color: #1a73e8;">技能列表</h4>
-                        <div class="skills-tags">
-                            ${resume.skills_objs.map(skill =>
-                                `<span class="skill-tag">${skill.skills_name} - ${skill.skills_level || ''}</span>`
-                            ).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-
-                ${resume.job_exp_objs && resume.job_exp_objs.length > 0 ? `
-                    <div style="margin-bottom: 30px;">
-                        <h4 style="margin-bottom: 15px; color: #1a73e8;">工作经历</h4>
-                        ${resume.job_exp_objs.map(job => `
-                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                                <div style="font-weight: 600;">${job.job_position} @ ${job.job_cpy}</div>
-                                <div style="color: #5f6368; margin: 5px 0;">${job.start_date} - ${job.end_date}</div>
-                                <div style="line-height: 1.6;">${job.job_content || ''}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
+                <!-- Profile 基本信息 -->
+                ${generateProfileSection(resume)}
+                
+                <!-- 个人评价 -->
+                ${generateAboutmeSection(resume)}
+                
+                <!-- 教育背景 -->
+                ${generateEducationListSection(resume)}
+                
+                <!-- 工作经历 -->
+                ${generateWorkExpListSection(resume)}
+                
+                <!-- 项目经验 -->
+                ${generateProjectListSection(resume)}
+                
+                <!-- 个人技能 -->
+                ${generateSkillListSection(resume)}
+                
+                <!-- 更多信息 -->
+                ${generateAwardListSection(resume)}
+                
+                <!-- 个人作品 -->
+                ${generateWorkListSection(resume)}
+                
+                <!-- 其他信息（未分组的字段） -->
+                ${generateOtherInfoSection(resume)}
             `;
         }
 
+        function generateProfileSection(resume) {
+            const profileFields = ['name', 'email', 'phone', 'mobile', 'github', 'zhihu', 'workExpYear', 'living_address', 'birthday', 'hometown_address', 'race', 'surname', 'hukou_address', 'city', 'gender', 'age'];
+            const hasProfileInfo = profileFields.some(field => resume[field]);
+            
+            if (!hasProfileInfo) return '';
+            
+            let html = '<div style="margin-bottom: 30px;"><h3 style="color: #1a73e8; margin-bottom: 15px;">👤 基本信息</h3>';
+            profileFields.forEach(field => {
+                if (resume[field]) {
+                    html += `<div style="margin-bottom: 8px;"><strong>${field}:</strong> ${resume[field]}</div>`;
+                }
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function generateAboutmeSection(resume) {
+            const aboutmeFields = ['aboutme_desc', 'self_introduction'];
+            const hasAboutmeInfo = aboutmeFields.some(field => resume[field]);
+            
+            if (!hasAboutmeInfo) return '';
+            
+            let html = '<div style="margin-bottom: 30px;"><h3 style="color: #1a73e8; margin-bottom: 15px;">📝 个人评价</h3>';
+            aboutmeFields.forEach(field => {
+                if (resume[field]) {
+                    html += `<div style="margin-bottom: 8px;"><strong>${field}:</strong> ${resume[field]}</div>`;
+                }
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function generateEducationListSection(resume) {
+            const eduFields = ['college', 'major', 'education', 'degree', 'college_type', 'college_rank', 'grad_time'];
+            const hasEducation = eduFields.some(field => resume[field]);
+            
+            if (!hasEducation) return '';
+            
+            let html = '<div style="margin-bottom: 30px;"><h3 style="color: #1a73e8; margin-bottom: 15px;">🎓 教育背景</h3>';
+            eduFields.forEach(field => {
+                if (resume[field]) {
+                    html += `<div style="margin-bottom: 8px;"><strong>${field}:</strong> ${resume[field]}</div>`;
+                }
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function generateWorkExpListSection(resume) {
+            const workFields = ['work_year', 'work_year_inf', 'work_start_time', 'work_start_time_inf', 'work_position', 'work_position_p', 'work_company', 'expect_job'];
+            const hasWorkInfo = workFields.some(field => resume[field]);
+            
+            if (!hasWorkInfo) return '';
+            
+            let html = '<div style="margin-bottom: 30px;"><h3 style="color: #1a73e8; margin-bottom: 15px;">💼 工作经历</h3>';
+            workFields.forEach(field => {
+                if (resume[field]) {
+                    html += `<div style="margin-bottom: 8px;"><strong>${field}:</strong> ${resume[field]}</div>`;
+                }
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function generateProjectListSection(resume) {
+            const projectFields = ['project_name', 'project_role', 'project_time', 'project_desc', 'project_content'];
+            const hasProjectInfo = projectFields.some(field => resume[field]);
+            
+            if (!hasProjectInfo) return '';
+            
+            let html = '<div style="margin-bottom: 30px;"><h3 style="color: #1a73e8; margin-bottom: 15px;">🏢 项目经验</h3>';
+            projectFields.forEach(field => {
+                if (resume[field]) {
+                    html += `<div style="margin-bottom: 8px;"><strong>${field}:</strong> ${resume[field]}</div>`;
+                }
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function generateSkillListSection(resume) {
+            const skills = Array.isArray(resume.skills_objs) ? resume.skills_objs : [];
+            const hasSkills = skills.length > 0;
+            
+            if (!hasSkills) return '';
+            
+            let html = '<div style="margin-bottom: 30px;"><h3 style="color: #1a73e8; margin-bottom: 15px;">💻 个人技能</h3>';
+            html += `<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                ${skills.map(skill => 
+                    `<span style="background: #e8f0fe; color: #1a73e8; padding: 6px 12px; border-radius: 16px; font-size: 12px; border: 1px solid #dadce0;">
+                        ${skill.skills_name}${skill.skills_level ? ` - ${skill.skills_level}` : ''}
+                    </span>`
+                ).join('')}
+            </div>`;
+            html += '</div>';
+            return html;
+        }
+
+        function generateAwardListSection(resume) {
+            const awards = Array.isArray(resume.award_info) ? resume.award_info : [];
+            const hasAwards = awards.length > 0;
+            
+            if (!hasAwards) return '';
+            
+            let html = '<div style="margin-bottom: 30px;"><h3 style="color: #1a73e8; margin-bottom: 15px;">🏆 更多信息</h3>';
+            awards.forEach(award => {
+                html += `<div style="margin-bottom: 8px;"><strong>奖项:</strong> ${award.award_name}</div>`;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function generateWorkListSection(resume) {
+            const works = Array.isArray(resume.work_name) ? resume.work_name : [];
+            const hasWorks = works.length > 0;
+            
+            if (!hasWorks) return '';
+            
+            let html = '<div style="margin-bottom: 30px;"><h3 style="color: #1a73e8; margin-bottom: 15px;">💼 个人作品</h3>';
+            works.forEach(work => {
+                html += `<div style="margin-bottom: 8px;"><strong>作品:</strong> ${work.work_name}</div>`;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function generateOtherInfoSection(resume) {
+            const allGrouped = new Set(Object.values(FIELD_GROUPS).flat());
+            const otherFields = Object.entries(resume)
+                .filter(([key, value]) => !allGrouped.has(key) && value !== undefined && value !== null && value !== '')
+                .map(([key, value]) => {
+                    let display = value;
+                    if (typeof value === 'object') {
+                        display = `<pre style="white-space:pre-wrap; background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 12px;">${JSON.stringify(value, null, 2)}</pre>`;
+                    }
+                    return `<div style="margin-bottom: 8px;"><strong>${key}:</strong> ${display}</div>`;
+                }).join('');
+            
+            if (!otherFields) return '';
+            
+            return `
+                <div style="margin-bottom: 30px;">
+                    <h3 style="color: #1a73e8; margin-bottom: 15px;">📝 其他信息</h3>
+                    ${otherFields}
+                </div>
+            `;
+        }
+
+        // 编辑弹窗改为分组折叠式
         function editResume(id) {
-            showMessage('编辑功能开发中...', 'info');
+            const resume = allResumes.find(r => r._id === id);
+            if (!resume) return;
+
+            // 构建分组折叠式表单
+            let formHtml = '<form id="editResumeForm">';
+            
+            // 按分组渲染字段
+            for (const [groupName, fields] of Object.entries(FIELD_GROUPS)) {
+                let groupFields = '';
+                fields.forEach(key => {
+                    if (resume[key] !== undefined) {
+                        groupFields += generateFieldInput(key, resume[key]);
+                    }
+                });
+                
+                if (groupFields) {
+                    const displayName = GROUP_NAME_MAP[groupName] || groupName;
+                    formHtml += `
+                        <div class="field-group" style="margin-bottom: 20px; border: 1px solid #e8eaed; border-radius: 8px; overflow: hidden;">
+                            <div class="group-header" style="background: #f8f9fa; padding: 12px 16px; cursor: pointer; font-weight: 600; color: #1a73e8;" onclick="toggleGroup(this)">
+                                <span style="margin-right: 8px;">📁</span>${displayName}
+                                <span class="toggle-icon" style="float: right;">▼</span>
+                            </div>
+                            <div class="group-content" style="padding: 16px;">
+                                ${groupFields}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            
+            // 添加字段按钮
+            formHtml += `
+                <div style="margin-bottom: 20px; text-align: center;">
+                    <button type="button" class="btn-small primary" onclick="addField()">+ 添加自定义字段</button>
+                </div>
+                <div style="text-align: right;">
+                    <button type="submit" class="action-btn">💾 保存</button>
+                    <button type="button" class="action-btn secondary" style="margin-left: 10px;" onclick="closeModal()">❌ 取消</button>
+                </div>
+            </form>`;
+
+            document.getElementById('modalTitle').textContent = '✏️ 编辑简历';
+            document.getElementById('modalBody').innerHTML = formHtml;
+            document.getElementById('detailModal').style.display = 'flex';
+
+            // 表单提交事件（保持原有逻辑）
+            document.getElementById('editResumeForm').onsubmit = async function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                const data = {};
+                
+                // 调试信息
+                console.log('表单提交 - 原始数据:', resume);
+                
+                for (const [k, v] of formData.entries()) {
+                    let value = v;
+                    
+                    // 调试信息
+                    console.log(`处理字段: ${k}`, {
+                        originalValue: v,
+                        originalType: typeof v,
+                        resumeFieldType: typeof resume[k],
+                        resumeFieldValue: resume[k]
+                    });
+                    
+                    // 尝试解析JSON
+                    if (v.trim() !== '') {
+                        try {
+                            value = JSON.parse(v);
+                            console.log(`JSON解析成功: ${k}`, value);
+                        } catch (e) {
+                            // JSON解析失败，检查原始字段类型
+                            if (Array.isArray(resume[k])) {
+                                console.log(`字段 ${k} 应为数组，但输入不是有效JSON，设为空数组`);
+                                value = [];
+                            } else if (typeof resume[k] === 'object' && resume[k] !== null) {
+                                console.log(`字段 ${k} 应为对象，但输入不是有效JSON`);
+                                alert(`字段 ${k} 请输入合法的 JSON 格式！\n\n当前输入: ${v}\n\n错误信息: ${e.message}`);
+                                return;
+                            } else {
+                                // 普通字符串字段，保持原值
+                                value = v;
+                                console.log(`字段 ${k} 保持字符串值:`, value);
+                            }
+                        }
+                    } else {
+                        // 空值处理
+                        if (Array.isArray(resume[k])) {
+                            value = [];
+                        } else if (typeof resume[k] === 'object' && resume[k] !== null) {
+                            value = {};
+                        } else {
+                            value = '';
+                        }
+                    }
+                    
+                    data[k] = value;
+                }
+                
+                // 处理邮箱字段别名
+                if (data['邮箱'] && !data['email']) {
+                    data['email'] = data['邮箱'];
+                    delete data['邮箱'];
+                }
+                
+                // 合并未修改的字段
+                Object.entries(resume).forEach(([k, v]) => {
+                    if (k === '_id') return;
+                    if (!(k in data)) {
+                        data[k] = v;
+                    }
+                });
+                
+                // 调试信息
+                console.log('提交的数据:', data);
+                
+                try {
+                    const response = await fetch(`${API_BASE_URL}/resume/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    const result = await response.json();
+                    if (response.ok) {
+                        showMessage('简历更新成功', 'success');
+                        closeModal();
+                        await loadData();
+                    } else {
+                        showMessage(result.error || '更新失败', 'error');
+                    }
+                } catch (error) {
+                    showMessage('更新失败: ' + error.message, 'error');
+                }
+            };
+        }
+
+        // 生成字段输入控件
+        function generateFieldInput(key, value) {
+            let inputHtml = '';
+            
+            // 调试信息
+            console.log(`生成字段输入: ${key}`, {
+                value: value,
+                type: typeof value,
+                isArray: Array.isArray(value),
+                isObject: typeof value === 'object' && value !== null,
+                constructor: value?.constructor?.name
+            });
+            
+            // 检查是否为复杂数据类型（对象、数组）
+            if (typeof value === 'object' && value !== null) {
+                // 对象或数组类型，使用textarea显示JSON
+                const jsonString = JSON.stringify(value, null, 2);
+                inputHtml = `<textarea name="${key}" style="width:100%;padding:8px;border:1px solid #dadce0;border-radius:4px;min-height:80px;font-family:monospace;" placeholder="请输入合法JSON格式">${jsonString}</textarea>`;
+            } else if (typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'))) {
+                // 可能是JSON字符串，尝试解析
+                try {
+                    const parsed = JSON.parse(value);
+                    const jsonString = JSON.stringify(parsed, null, 2);
+                    inputHtml = `<textarea name="${key}" style="width:100%;padding:8px;border:1px solid #dadce0;border-radius:4px;min-height:80px;font-family:monospace;" placeholder="请输入合法JSON格式">${jsonString}</textarea>`;
+                } catch (e) {
+                    // 解析失败，当作普通字符串处理
+                    inputHtml = `<input type="text" name="${key}" value="${value !== undefined ? value : ''}" style="width:100%;padding:8px;border:1px solid #dadce0;border-radius:4px;" />`;
+                }
+            } else {
+                // 普通类型，使用input
+                inputHtml = `<input type="text" name="${key}" value="${value !== undefined ? value : ''}" style="width:100%;padding:8px;border:1px solid #dadce0;border-radius:4px;" />`;
+            }
+            
+            return `
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #5f6368;">${key}:</label>
+                    ${inputHtml}
+                </div>
+            `;
+        }
+
+        // 分组折叠/展开
+        function toggleGroup(header) {
+            const content = header.nextElementSibling;
+            const icon = header.querySelector('.toggle-icon');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.textContent = '▼';
+            } else {
+                content.style.display = 'none';
+                icon.textContent = '▶';
+            }
+        }
+
+        // 导出简历数据
+        function exportResume(id) {
+            const resume = allResumes.find(r => r._id === id);
+            if (!resume) return;
+            
+            const dataStr = JSON.stringify(resume, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${resume.name || 'resume'}_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+            showMessage('简历数据导出成功', 'success');
+        }
+
+        // 添加字段时支持类型选择和分组
+        function addField() {
+            const form = document.getElementById('editResumeForm');
+            const div = document.createElement('div');
+            div.style = 'display:flex;align-items:center;margin-bottom:10px;gap:8px;';
+            div.innerHTML = `
+                <input type="text" placeholder="字段名(建议英文小写)" style="min-width:90px;padding:6px 8px;border:1px solid #dadce0;border-radius:4px;" oninput="this.nextElementSibling.name=this.value" />
+                <select style="padding:6px 8px;border:1px solid #dadce0;border-radius:4px;" onchange="updateFieldInputType(this)">
+                    <option value="text">文本</option>
+                    <option value="number">数字</option>
+                    <option value="date">日期</option>
+                    <option value="json">JSON</option>
+                </select>
+                <input type="text" placeholder="字段值" style="flex:1;padding:6px 8px;border:1px solid #dadce0;border-radius:4px;" />
+                <select style="padding:6px 8px;border:1px solid #dadce0;border-radius:4px;" name="group">
+                    <option value="其他">其他</option>
+                    <option value="基本信息">基本信息</option>
+                    <option value="教育背景">教育背景</option>
+                    <option value="工作经历">工作经历</option>
+                    <option value="项目经验">项目经验</option>
+                    <option value="个人技能">个人技能</option>
+                    <option value="更多信息">更多信息</option>
+                    <option value="个人作品">个人作品</option>
+                    <option value="个人评价">个人评价</option>
+                </select>
+                <button type="button" class="btn-small danger" onclick="removeField(this)">删除</button>
+            `;
+            // 字段名唯一性校验
+            div.querySelector('input[placeholder^="字段名"]').addEventListener('blur', function() {
+                const fieldName = this.value.trim();
+                if (fieldName && form.querySelector(`[name="${fieldName}"]`)) {
+                    alert('该字段已存在，请勿重复添加！');
+                    this.value = '';
+                }
+            });
+            form.insertBefore(div, form.children[form.children.length-2]);
+        }
+
+        // 字段类型切换时渲染不同输入控件
+        function updateFieldInputType(select) {
+            const input = select.parentElement.querySelector('input[placeholder^="字段值"]');
+            if (!input) return;
+            const type = select.value;
+            if (type === 'json') {
+                const textarea = document.createElement('textarea');
+                textarea.placeholder = '请输入合法JSON，如 [ {...} ]';
+                textarea.style = input.style.cssText + ';min-height:60px;';
+                textarea.name = input.name;
+                input.parentElement.replaceChild(textarea, input);
+            } else {
+                const newInput = document.createElement('input');
+                newInput.type = type;
+                newInput.placeholder = '字段值';
+                newInput.style = input.style.cssText;
+                newInput.name = input.name;
+                input.parentElement.replaceChild(newInput, input);
+            }
+        }
+
+        // 删除字段
+        function removeField(btn, key) {
+            const div = btn.parentElement;
+            div.remove();
         }
 
         function deleteResume(id) {
