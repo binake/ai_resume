@@ -371,12 +371,14 @@
                     </div>
                 </div>
 
-                <!-- AI对话页面 -->
-                <div class="content-area" id="ai-chat">
-                    <h2 style="margin-bottom: 20px;">AI智能对话</h2>
-                    <div class="stat-card">
-                        <h3 style="margin-bottom: 15px;">智能助手</h3>
-                        <p>AI对话功能开发中...</p>
+                <!-- AI对话页面（只在这里有iframe） -->
+                <div class="content-area" id="ai-chat" style="height: calc(100vh - 60px); min-height: 600px;">
+                    <div style="flex: 1; display: flex; flex-direction: column; height: 100%;">
+                        <iframe
+                            src="http://localhost/chat?dialogId=7e0f210a66fd11f097190242ac120003&conversationId=432c8f6f1f25426a912b95623a2008c8&isNew="
+                            style="width: 100%; height: 100%; border: none;"
+                            frameborder="0"
+                        ></iframe>
                     </div>
                 </div>
 
@@ -1465,21 +1467,34 @@ async function parseFile(fileId, filename) {
                     ${files.map((file, index) => {
                         // 更详细的文件名处理逻辑
                         let displayName = '未知文件';
-
                         if (file.original_filename && file.original_filename.trim() !== '') {
                             displayName = file.original_filename;
                         } else if (file.filename && file.filename.trim() !== '') {
                             displayName = file.filename;
                         }
-
-                        // 调试信息
-                        console.log(`渲染${categoryName}文件 ${index + 1}:`, {
-                            original_filename: file.original_filename,
-                            filename: file.filename,
-                            displayName: displayName,
-                            file_id: file.file_id
-                        });
-
+                        // 解析状态显示
+                        const parseStatus = file.parse_status || 'pending';
+                        const parseEnabled = file.parse_enabled !== false;
+                        let statusBadge = '';
+                        let statusColor = '';
+                        switch(parseStatus) {
+                            case 'pending':
+                                statusBadge = '未解析';
+                                statusColor = '#666';
+                                break;
+                            case 'processing':
+                                statusBadge = '解析中';
+                                statusColor = '#1a73e8';
+                                break;
+                            case 'completed':
+                                statusBadge = '已解析';
+                                statusColor = '#34a853';
+                                break;
+                            case 'failed':
+                                statusBadge = '解析失败';
+                                statusColor = '#ea4335';
+                                break;
+                        }
                         return `
                         <div class="file-card">
                             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
@@ -1491,18 +1506,25 @@ async function parseFile(fileId, filename) {
                                     <div style="font-size: 12px; color: #5f6368;">
                                         ${formatFileSize(file.size)} • ${formatDate(file.upload_date)}
                                     </div>
-                                    ${file.original_filename && file.filename && file.original_filename !== file.filename ? `
-                                        <div style="font-size: 10px; color: #888; margin-top: 2px;">
-                                            存储为: ${file.filename}
+                                    <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px;">
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <span style="font-size: 12px; color: #5f6368;">启用解析:</span>
+                                            <label class="switch" style="position: relative; display: inline-block; width: 34px; height: 20px;border-radius: 20px;background: grey;">
+                                                <input type="checkbox" ${parseEnabled ? 'checked' : ''} onchange="toggleParseEnabled('${file.file_id}', this.checked)">
+                                                <span class="slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; transition: .4s; border-radius: 20px;"></span>
+                                            </label>
                                         </div>
-                                    ` : ''}
-                                    <!-- 调试信息显示 -->
-                                    <div style="font-size: 9px; color: #ccc; margin-top: 1px;">
-                                        ID: ${file.file_id} | Original: ${file.original_filename || 'null'} | Storage: ${file.filename || 'null'}
+                                        <div style="display: flex; align-items: center; gap: 4px;">
+                                            <span style="font-size: 12px; color: #5f6368;">解析状态:</span>
+                                            <span style="font-size: 12px; color: ${statusColor}; font-weight: 500;">${statusBadge}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             <div style="display: flex; gap: 8px;">
+                                <button class="btn-small primary" onclick="parseResumeFileAndRefresh('${file.file_id}', '${displayName.replace(/'/g, "\\'")}')" ${parseStatus === 'processing' ? 'disabled' : ''}>
+                                    ${parseStatus === 'processing' ? '解析中...' : '解析'}
+                                </button>
                                 <button class="btn-small primary" onclick="downloadFile('${file.file_id}', '${displayName.replace(/'/g, "\\'")}')">
                                     下载
                                 </button>
@@ -1519,35 +1541,24 @@ async function parseFile(fileId, filename) {
         async function uploadCategoryFiles(files, category) {
             try {
                 const formData = new FormData();
-
-                // 添加调试信息：显示要上传的文件
                 console.log(`=== 准备上传${FILE_CATEGORIES[category]}文件 ===`);
                 for (let i = 0; i < files.length; i++) {
                     formData.append('files', files[i]);
                     console.log(`上传文件 ${i + 1}: "${files[i].name}" (${formatFileSize(files[i].size)})`);
                 }
-
                 showUploadProgress(category, true);
-
                 const response = await fetch(`${API_BASE_URL}/files/category/${category}`, {
                     method: 'POST',
                     body: formData
                 });
-
                 const result = await response.json();
-
-                // 添加调试信息：显示服务器返回结果
                 console.log(`=== ${FILE_CATEGORIES[category]}上传响应 ===`);
                 console.log('响应状态:', response.status);
                 console.log('响应数据:', result);
-
                 showUploadProgress(category, false);
-
                 if (response.ok) {
                     const successCount = result.uploaded_files ? result.uploaded_files.length : 0;
                     let message = `成功上传 ${successCount} 个文件到${FILE_CATEGORIES[category]}`;
-
-                    // 显示每个上传文件的详细信息
                     if (result.uploaded_files) {
                         console.log(`=== ${FILE_CATEGORIES[category]}上传成功的文件详情 ===`);
                         result.uploaded_files.forEach((file, index) => {
@@ -1559,24 +1570,25 @@ async function parseFile(fileId, filename) {
                             });
                         });
                     }
-
                     if (result.errors && result.errors.length > 0) {
                         message += `，${result.errors.length} 个文件失败`;
                         console.warn('上传错误:', result.errors);
                     }
-
                     showMessage(message, 'success');
-
+                    // 个人简历上传后自动解析
+                    if (category === 'resume' && result.uploaded_files) {
+                        for (const file of result.uploaded_files) {
+                            await parseResumeFileAndRefresh(file.file_id, file.original_filename || file.filename);
+                        }
+                    }
                     // 重新加载文件列表
                     await loadCategoryFiles(category);
-
                     return true;
                 } else {
                     console.error('上传失败:', result);
                     showMessage(result.error || '文件上传失败', 'error');
                     return false;
                 }
-
             } catch (error) {
                 showUploadProgress(category, false);
                 console.error('文件上传失败:', error);
@@ -2359,9 +2371,22 @@ async function parseFile(fileId, filename) {
         }
 
         function deleteResume(id) {
-            if (confirm('确定要删除这份简历吗？')) {
-                showMessage('删除功能开发中...', 'info');
-            }
+            if (!confirm('确定要删除这份简历吗？')) return;
+            fetch(`${API_BASE_URL}/resume/${id}`, {
+                method: 'DELETE'
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (result.message) {
+                    showMessage('简历删除成功', 'success');
+                    loadData();
+                } else {
+                    showMessage(result.error || '删除失败', 'error');
+                }
+            })
+            .catch(err => {
+                showMessage('删除失败: ' + err.message, 'error');
+            });
         }
 
         function closeModal() {
@@ -2699,6 +2724,160 @@ async function parseFile(fileId, filename) {
                 input.style.display = 'none';
                 document.getElementById(`sidebarProjectNameDisplay-${projectId}`).style.display = 'inline';
             }
+        }
+
+        async function parseResumeFileAndRefresh(fileId, filename) {
+            try {
+                showMessage(`开始解析简历: ${filename}`, 'info');
+                const response = await fetch(`${API_BASE_URL}/files/${fileId}/parse`, { method: 'POST' });
+                const result = await response.json();
+                if (response.ok) {
+                    showMessage(`简历解析完成: ${filename}`, 'success');
+                    await loadData(); // 刷新仪表板和简历管理
+                } else {
+                    showMessage(result.error || '解析失败', 'error');
+                }
+            } catch (error) {
+                showMessage('解析失败: ' + error.message, 'error');
+            }
+        }
+
+        // 在<script>标签内添加：
+        const CHAT_API_BASE = 'http://localhost:5000/api/v1';
+        const CHAT_API_KEY = 'ragflow-JkN2JmM2M4NjUyYjExZjA5Yjc2MDI0Mm';
+        // const CHAT_ID = '58d5d9c0654911f082290242ac120003';
+        const CHAT_ID = '37a232fc651d11f0a5160242ac120003';
+        let chatSessions = [];
+        let currentSessionId = null;
+        let currentSessionMessages = [];
+
+        async function fetchSessions() {
+            const res = await fetch(`${CHAT_API_BASE}/chats/${CHAT_ID}/sessions`, {
+                headers: { 'Authorization': `Bearer ${CHAT_API_KEY}` }
+            });
+            const result = await res.json();
+            chatSessions = result.data || [];
+            renderChatSessionList();
+            // 自动选中第一个会话（仅首次或无选中时）
+            if (chatSessions.length > 0 && !currentSessionId) {
+                selectChatSession(chatSessions[0].session_id);
+            }
+        }
+
+        async function createSession(name) {
+            const res = await fetch(`${CHAT_API_BASE}/chats/${CHAT_ID}/sessions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${CHAT_API_KEY}`
+                },
+                body: JSON.stringify({ name })
+            });
+            const result = await res.json();
+            await fetchSessions();
+            // 自动选中新建的会话
+            if (result.data && result.data.session_id) {
+                selectChatSession(result.data.session_id);
+            } else if (chatSessions.length > 0) {
+                selectChatSession(chatSessions[0].session_id);
+            }
+        }
+
+        function showNewSessionInput() {
+            document.getElementById('newSessionInput').style.display = 'block';
+            document.getElementById('newSessionNameInput').focus();
+        }
+        function handleNewSessionInput(event) {
+            if (event.key === 'Enter') {
+                const name = event.target.value.trim();
+                if (name) {
+                    createSession(name);
+                    event.target.value = '';
+                    document.getElementById('newSessionInput').style.display = 'none';
+                }
+            } else if (event.key === 'Escape') {
+                event.target.value = '';
+                document.getElementById('newSessionInput').style.display = 'none';
+            }
+        }
+        function renderChatSessionList() {
+            const list = document.getElementById('chatSessionList');
+            if (!list) return;
+            if (chatSessions.length === 0) {
+                list.innerHTML = '<div style="color:#888;text-align:center;padding:20px;">暂无会话</div>';
+                return;
+            }
+            list.innerHTML = chatSessions.map(s => `
+                <div class="chat-session-item${s.session_id === currentSessionId ? ' active' : ''}" style="padding:8px 16px;cursor:pointer;" onclick="selectChatSession('${s.session_id}')">
+                    ${s.name || 'New sessions'}
+                </div>
+            `).join('');
+        }
+        async function selectChatSession(sessionId) {
+            currentSessionId = sessionId;
+            renderChatSessionList();
+            await fetchMessages(sessionId);
+        }
+        async function fetchMessages(sessionId) {
+            const res = await fetch(`${CHAT_API_BASE}/chats/${CHAT_ID}/sessions/${sessionId}/messages`, {
+                headers: { 'Authorization': `Bearer ${CHAT_API_KEY}` }
+            });
+            const result = await res.json();
+            currentSessionMessages = result.data || [];
+            renderMessages();
+        }
+        function renderMessages() {
+            const list = document.getElementById('chatMessageList');
+            if (!list) return;
+            if (!currentSessionMessages.length) {
+                list.innerHTML = '<div style="color:#888;text-align:center;padding:40px;">暂无消息</div>';
+                return;
+            }
+            list.innerHTML = currentSessionMessages.map(msg => `
+                <div style="margin-bottom: 18px; display: flex; ${msg.role === 'user' ? 'justify-content: flex-end;' : 'justify-content: flex-start;'}">
+                    <div style="max-width: 70%; background: ${msg.role === 'user' ? '#e8f0fe' : '#f1f3f4'}; color: #222; padding: 10px 16px; border-radius: 12px; font-size: 15px;">
+                        ${msg.content}
+                    </div>
+                </div>
+            `).join('');
+            setTimeout(() => { list.scrollTop = list.scrollHeight; }, 100);
+        }
+        document.getElementById('chatInputForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const input = document.getElementById('chatInput');
+            const content = input.value.trim();
+            if (!content || !currentSessionId) return;
+            input.value = '';
+            await sendMessage(content);
+        };
+        async function sendMessage(content) {
+            // 先把用户消息加到本地流
+            currentSessionMessages.push({ role: 'user', content });
+            renderMessages();
+            // 调用API获取assistant回复
+            const res = await fetch(`${CHAT_API_BASE}/chats_openai/${CHAT_ID}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${CHAT_API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: 'model',
+                    messages: currentSessionMessages,
+                    stream: false
+                })
+            });
+            const result = await res.json();
+            if (result.choices && result.choices[0] && result.choices[0].message) {
+                currentSessionMessages.push({ role: 'assistant', content: result.choices[0].message.content });
+                renderMessages();
+            } else {
+                showMessage(result.error || 'AI回复失败', 'error');
+            }
+        }
+        // 页面初始化时拉取会话列表
+        if (document.getElementById('ai-chat')) {
+            fetchSessions();
         }
     </script>
 </body>

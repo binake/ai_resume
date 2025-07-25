@@ -1086,6 +1086,20 @@ def save_resume():
         return create_json_response({"error": "服务器内部错误"}, 500)
 
 
+@app.route('/api/resume/<record_id>', methods=['DELETE'])
+def delete_resume(record_id):
+    """删除指定简历数据"""
+    try:
+        result = mongo_client.collection.delete_one({"_id": ObjectId(record_id)})
+        if result.deleted_count > 0:
+            return create_json_response({"message": "删除成功"})
+        else:
+            return create_json_response({"error": "未找到指定简历"}, 404)
+    except Exception as e:
+        logger.error(f"简历删除失败: {e}")
+        return create_json_response({"error": "服务器内部错误", "detail": str(e)}, 500)
+
+
 # ============ 项目管理API ============
 @app.route('/api/projects', methods=['GET'])
 def get_projects():
