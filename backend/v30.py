@@ -151,31 +151,25 @@ class MongoDBClient:
 
     # ============ 简历数据相关方法 ============
     def get_all_result_data(self):
-        """获取parseresults集合中所有文档的data.result字段"""
+        """获取parseresults集合中所有文档的自定义数据字段"""
         try:
-            cursor = self.collection.find({}, {"data.result": 1, "_id": 1})
+            cursor = self.collection.find({}, {"custom_data": 1, "original_data": 1, "_id": 1})
             results = []
 
             for document in cursor:
-                if "data" in document and "result" in document["data"]:
-                    result_data = document["data"]["result"]
-                    
-                    # 调试信息：检查原始数据
-                    if "skills_objs" in result_data:
-                        logger.info(f"原始 skills_objs: {type(result_data['skills_objs'])} - {result_data['skills_objs']}")
-                    if "job_exp_objs" in result_data:
-                        logger.info(f"原始 job_exp_objs: {type(result_data['job_exp_objs'])} - {result_data['job_exp_objs']}")
-                    
+                # 优先使用自定义数据结构，如果没有则使用原始数据
+                if "custom_data" in document and document["custom_data"]:
+                    result_data = document["custom_data"]
                     # 处理编码
                     result_data = self.ensure_utf8_encoding(result_data)
-                    
-                    # 调试信息：检查编码处理后的数据
-                    if "skills_objs" in result_data:
-                        logger.info(f"编码处理后 skills_objs: {type(result_data['skills_objs'])} - {result_data['skills_objs']}")
-                    if "job_exp_objs" in result_data:
-                        logger.info(f"编码处理后 job_exp_objs: {type(result_data['job_exp_objs'])} - {result_data['job_exp_objs']}")
-                    
                     # 添加MongoDB的_id字段
+                    result_data["_id"] = str(document["_id"])
+                    results.append(result_data)
+                elif "original_data" in document and "result" in document["original_data"]:
+                    # 如果没有自定义数据，则使用原始数据并尝试映射
+                    original_result = document["original_data"]["result"]
+                    result_data = self.map_parser_result_to_custom_structure(original_result)
+                    result_data = self.ensure_utf8_encoding(result_data)
                     result_data["_id"] = str(document["_id"])
                     results.append(result_data)
 
@@ -190,12 +184,21 @@ class MongoDBClient:
         """获取最新的一条简历数据"""
         try:
             # 按_id降序排列，获取最新的一条记录
-            cursor = self.collection.find({}, {"data.result": 1, "_id": 1}).sort("_id", -1).limit(1)
+            cursor = self.collection.find({}, {"custom_data": 1, "original_data": 1, "_id": 1}).sort("_id", -1).limit(1)
 
             for document in cursor:
-                if "data" in document and "result" in document["data"]:
-                    result_data = document["data"]["result"]
+                # 优先使用自定义数据结构，如果没有则使用原始数据
+                if "custom_data" in document and document["custom_data"]:
+                    result_data = document["custom_data"]
                     # 处理编码
+                    result_data = self.ensure_utf8_encoding(result_data)
+                    result_data["_id"] = str(document["_id"])
+                    logger.info(f"成功获取最新记录: {document['_id']}")
+                    return result_data
+                elif "original_data" in document and "result" in document["original_data"]:
+                    # 如果没有自定义数据，则使用原始数据并尝试映射
+                    original_result = document["original_data"]["result"]
+                    result_data = self.map_parser_result_to_custom_structure(original_result)
                     result_data = self.ensure_utf8_encoding(result_data)
                     result_data["_id"] = str(document["_id"])
                     logger.info(f"成功获取最新记录: {document['_id']}")
@@ -213,16 +216,26 @@ class MongoDBClient:
         try:
             document = self.collection.find_one(
                 {"_id": ObjectId(record_id)},
-                {"data.result": 1, "_id": 1}
+                {"custom_data": 1, "original_data": 1, "_id": 1}
             )
 
-            if document and "data" in document and "result" in document["data"]:
-                result_data = document["data"]["result"]
-                # 处理编码
-                result_data = self.ensure_utf8_encoding(result_data)
-                result_data["_id"] = str(document["_id"])
-                logger.info(f"成功获取指定记录: {record_id}")
-                return result_data
+            if document:
+                # 优先使用自定义数据结构，如果没有则使用原始数据
+                if "custom_data" in document and document["custom_data"]:
+                    result_data = document["custom_data"]
+                    # 处理编码
+                    result_data = self.ensure_utf8_encoding(result_data)
+                    result_data["_id"] = str(document["_id"])
+                    logger.info(f"成功获取指定记录: {record_id}")
+                    return result_data
+                elif "original_data" in document and "result" in document["original_data"]:
+                    # 如果没有自定义数据，则使用原始数据并尝试映射
+                    original_result = document["original_data"]["result"]
+                    result_data = self.map_parser_result_to_custom_structure(original_result)
+                    result_data = self.ensure_utf8_encoding(result_data)
+                    result_data["_id"] = str(document["_id"])
+                    logger.info(f"成功获取指定记录: {record_id}")
+                    return result_data
 
             logger.warning(f"未找到ID为 {record_id} 的记录")
             return None
@@ -236,9 +249,7 @@ class MongoDBClient:
         try:
             # 构造完整的文档结构
             document = {
-                "data": {
-                    "result": data
-                },
+                "custom_data": data,  # 使用自定义数据结构
                 "created_at": datetime.now(),
                 "updated_at": datetime.now()
             }
@@ -345,6 +356,26 @@ class MongoDBClient:
         except Exception as e:
             logger.error(f"删除项目失败: {e}")
             return False
+
+    def update_project_name(self, project_id, new_name):
+        """修改项目名称"""
+        try:
+            # 检查新名称是否已存在（排除自身）
+            existing = self.projects_collection.find_one({"name": new_name, "_id": {"$ne": ObjectId(project_id)}})
+            if existing:
+                return None, "项目名称已存在"
+            result = self.projects_collection.update_one(
+                {"_id": ObjectId(project_id)},
+                {"$set": {"name": new_name, "updated_at": datetime.now()}}
+            )
+            if result.matched_count == 0:
+                return None, "项目不存在"
+            # 返回更新后的项目
+            project = self.get_project_by_id(project_id)
+            return project, None
+        except Exception as e:
+            logger.error(f"修改项目名称失败: {e}")
+            return None, str(e)
 
     # ============ 文件管理相关方法 ============
     def save_file_to_disk(self, file, category, project_id=None, filename=None):
@@ -517,6 +548,286 @@ class MongoDBClient:
             logger.error(f"删除文件失败: {e}")
             return False
 
+    def map_parser_result_to_custom_structure(self, parser_result):
+        """
+        将第三方API解析结果映射到自定义数据库结构
+        完全按照ResumeSDK官方文档的字段结构进行映射
+        """
+        try:
+            custom_data = {}
+            
+            # 基本信息映射 - 对应官方文档的"基本信息"模块
+            if 'profile' in parser_result:
+                profile = parser_result['profile']
+                custom_data.update({
+                    'name': profile.get('name', ''),
+                    'gender': profile.get('gender', ''),
+                    'age': profile.get('age', ''),
+                    'birthday': profile.get('birthday', ''),
+                    'mobile': profile.get('mobile', ''),
+                    'email': profile.get('email', ''),
+                    'living_address': profile.get('living_address', ''),
+                    'hometown_address': profile.get('hometown_address', ''),
+                    'hukou_address': profile.get('hukou_address', ''),
+                    'city': profile.get('city', ''),
+                    'race': profile.get('race', ''),
+                    'surname': profile.get('surname', ''),
+                    'workExpYear': profile.get('workExpYear', ''),
+                    'github': profile.get('github', ''),
+                    'zhihu': profile.get('zhihu', ''),
+                    'wechat': profile.get('wechat', ''),
+                    'qq': profile.get('qq', ''),
+                    'linkedin': profile.get('linkedin', ''),
+                    'blog': profile.get('blog', ''),
+                    'website': profile.get('website', ''),
+                    'avatar': profile.get('avatar', ''),
+                    'expect_job': profile.get('expect_job', ''),
+                    'expect_salary': profile.get('expect_salary', ''),
+                    'expect_city': profile.get('expect_city', ''),
+                    'expect_industry': profile.get('expect_industry', ''),
+                    'resume_name': profile.get('resume_name', ''),
+                    'resume_update_time': profile.get('resume_update_time', ''),
+                    'resume_text': profile.get('resume_text', '')
+                })
+            
+            # 从其他字段提取基本信息
+            custom_data.update({
+                'gender': parser_result.get('gender', custom_data.get('gender', '')),
+                'age': parser_result.get('age', custom_data.get('age', '')),
+                'birthday': parser_result.get('birthday', custom_data.get('birthday', '')),
+                'mobile': parser_result.get('mobile', parser_result.get('phone', custom_data.get('mobile', ''))),
+                'email': parser_result.get('email', custom_data.get('email', '')),
+                'living_address': parser_result.get('living_address', custom_data.get('living_address', '')),
+                'hometown_address': parser_result.get('hometown_address', custom_data.get('hometown_address', '')),
+                'hukou_address': parser_result.get('hukou_address', custom_data.get('hukou_address', '')),
+                'city': parser_result.get('city', custom_data.get('city', '')),
+                'race': parser_result.get('race', custom_data.get('race', '')),
+                'surname': parser_result.get('surname', custom_data.get('surname', '')),
+                'workExpYear': parser_result.get('workExpYear', custom_data.get('workExpYear', '')),
+                'github': parser_result.get('github', custom_data.get('github', '')),
+                'zhihu': parser_result.get('zhihu', custom_data.get('zhihu', '')),
+                'wechat': parser_result.get('wechat', custom_data.get('wechat', '')),
+                'qq': parser_result.get('qq', custom_data.get('qq', '')),
+                'linkedin': parser_result.get('linkedin', custom_data.get('linkedin', '')),
+                'blog': parser_result.get('blog', custom_data.get('blog', '')),
+                'website': parser_result.get('website', custom_data.get('website', '')),
+                'avatar': parser_result.get('avatar', custom_data.get('avatar', '')),
+                'expect_job': parser_result.get('expect_job', custom_data.get('expect_job', '')),
+                'expect_salary': parser_result.get('expect_salary', custom_data.get('expect_salary', '')),
+                'expect_city': parser_result.get('expect_city', custom_data.get('expect_city', '')),
+                'expect_industry': parser_result.get('expect_industry', custom_data.get('expect_industry', '')),
+                'resume_name': parser_result.get('resume_name', custom_data.get('resume_name', '')),
+                'resume_update_time': parser_result.get('resume_update_time', custom_data.get('resume_update_time', '')),
+                'resume_text': parser_result.get('resume_text', custom_data.get('resume_text', ''))
+            })
+            
+            # 教育经历映射 - 对应官方文档的"教育经历"模块
+            if 'educationList' in parser_result and isinstance(parser_result['educationList'], list):
+                education_list = parser_result['educationList']
+                if education_list:
+                    # 取最新的教育经历作为主要教育信息
+                    latest_education = education_list[0]
+                    custom_data.update({
+                        'college': latest_education.get('college', ''),
+                        'major': latest_education.get('major', ''),
+                        'education': latest_education.get('education', ''),
+                        'degree': latest_education.get('degree', ''),
+                        'college_type': latest_education.get('college_type', ''),
+                        'college_rank': latest_education.get('college_rank', ''),
+                        'grad_time': latest_education.get('grad_time', ''),
+                        'education_start_time': latest_education.get('education_start_time', ''),
+                        'education_end_time': latest_education.get('education_end_time', ''),
+                        'gpa': latest_education.get('gpa', ''),
+                        'course': latest_education.get('course', ''),
+                        'education_desc': latest_education.get('education_desc', '')
+                    })
+                # 保存完整的教育经历列表
+                custom_data['educationList'] = education_list
+            
+            # 从其他字段提取教育信息
+            custom_data.update({
+                'college': parser_result.get('college', custom_data.get('college', '')),
+                'major': parser_result.get('major', custom_data.get('major', '')),
+                'education': parser_result.get('education', parser_result.get('degree', custom_data.get('education', ''))),
+                'degree': parser_result.get('degree', custom_data.get('degree', '')),
+                'college_type': parser_result.get('college_type', custom_data.get('college_type', '')),
+                'college_rank': parser_result.get('college_rank', custom_data.get('college_rank', '')),
+                'grad_time': parser_result.get('grad_time', custom_data.get('grad_time', '')),
+                'education_start_time': parser_result.get('education_start_time', custom_data.get('education_start_time', '')),
+                'education_end_time': parser_result.get('education_end_time', custom_data.get('education_end_time', '')),
+                'gpa': parser_result.get('gpa', custom_data.get('gpa', '')),
+                'course': parser_result.get('course', custom_data.get('course', '')),
+                'education_desc': parser_result.get('education_desc', custom_data.get('education_desc', ''))
+            })
+            
+            # 工作经历映射 - 对应官方文档的"工作经历及实习经历"模块
+            work_experience = []
+            if 'workExpList' in parser_result and isinstance(parser_result['workExpList'], list):
+                for work in parser_result['workExpList']:
+                    work_experience.append({
+                        'company_name': work.get('company_name', ''),
+                        'department_name': work.get('department_name', ''),
+                        'job_position': work.get('job_position', ''),
+                        'work_time': work.get('work_time', []),
+                        'work_start_time': work.get('work_start_time', ''),
+                        'work_end_time': work.get('work_end_time', ''),
+                        'work_desc': work.get('work_desc', ''),
+                        'salary': work.get('salary', ''),
+                        'work_type': work.get('work_type', ''),
+                        'industry': work.get('industry', ''),
+                        'company_size': work.get('company_size', ''),
+                        'company_nature': work.get('company_nature', ''),
+                        'report_to': work.get('report_to', ''),
+                        'subordinates': work.get('subordinates', ''),
+                        'achievement': work.get('achievement', '')
+                    })
+            elif 'job_exp_objs' in parser_result and isinstance(parser_result['job_exp_objs'], list):
+                for job in parser_result['job_exp_objs']:
+                    work_experience.append({
+                        'company_name': job.get('job_cpy', ''),
+                        'department_name': job.get('department_name', ''),
+                        'job_position': job.get('job_position', ''),
+                        'work_time': [job.get('start_date', ''), job.get('end_date', '')],
+                        'work_start_time': job.get('start_date', ''),
+                        'work_end_time': job.get('end_date', ''),
+                        'work_desc': job.get('job_content', ''),
+                        'salary': job.get('salary', ''),
+                        'work_type': job.get('work_type', ''),
+                        'industry': job.get('industry', ''),
+                        'company_size': job.get('company_size', ''),
+                        'company_nature': job.get('company_nature', ''),
+                        'report_to': job.get('report_to', ''),
+                        'subordinates': job.get('subordinates', ''),
+                        'achievement': job.get('achievement', '')
+                    })
+            
+            custom_data['work_experience'] = work_experience
+            
+            # 项目经历映射 - 对应官方文档的"项目经历"模块
+            project_experience = []
+            if 'projectList' in parser_result and isinstance(parser_result['projectList'], list):
+                for project in parser_result['projectList']:
+                    project_experience.append({
+                        'project_name': project.get('project_name', ''),
+                        'project_role': project.get('project_role', ''),
+                        'project_time': project.get('project_time', ''),
+                        'project_start_time': project.get('project_start_time', ''),
+                        'project_end_time': project.get('project_end_time', ''),
+                        'project_desc': project.get('project_desc', ''),
+                        'project_content': project.get('project_content', ''),
+                        'project_technology': project.get('project_technology', ''),
+                        'project_result': project.get('project_result', ''),
+                        'project_scale': project.get('project_scale', ''),
+                        'project_budget': project.get('project_budget', ''),
+                        'project_team_size': project.get('project_team_size', '')
+                    })
+            
+            custom_data['project_experience'] = project_experience
+            
+            # 技能列表映射 - 对应官方文档的"技能列表"模块
+            skills = []
+            if 'skillList' in parser_result and isinstance(parser_result['skillList'], list):
+                for skill in parser_result['skillList']:
+                    skills.append({
+                        'skill_name': skill.get('skill_name', ''),
+                        'skill_level': skill.get('skill_level', ''),
+                        'skill_desc': skill.get('skill_desc', ''),
+                        'skill_years': skill.get('skill_years', ''),
+                        'skill_category': skill.get('skill_category', '')
+                    })
+            elif 'skills_objs' in parser_result and isinstance(parser_result['skills_objs'], list):
+                for skill in parser_result['skills_objs']:
+                    skills.append({
+                        'skill_name': skill.get('skills_name', ''),
+                        'skill_level': skill.get('skills_level', ''),
+                        'skill_desc': skill.get('skills_desc', ''),
+                        'skill_years': skill.get('skill_years', ''),
+                        'skill_category': skill.get('skill_category', '')
+                    })
+            
+            custom_data['skills'] = skills
+            
+            # 语言技能映射 - 对应官方文档的"语言技能"模块
+            language_skills = []
+            if 'languageList' in parser_result and isinstance(parser_result['languageList'], list):
+                for language in parser_result['languageList']:
+                    language_skills.append({
+                        'language_name': language.get('language_name', ''),
+                        'language_level': language.get('language_level', ''),
+                        'language_certificate': language.get('language_certificate', ''),
+                        'language_score': language.get('language_score', '')
+                    })
+            
+            custom_data['language_skills'] = language_skills
+            
+            # 证书奖项映射 - 对应官方文档的"所有证书及奖项"模块
+            certificates = []
+            if 'awardList' in parser_result and isinstance(parser_result['awardList'], list):
+                for award in parser_result['awardList']:
+                    certificates.append({
+                        'award_info': award.get('award_info', ''),
+                        'award_time': award.get('award_time', ''),
+                        'award_desc': award.get('award_desc', ''),
+                        'award_level': award.get('award_level', ''),
+                        'award_issuer': award.get('award_issuer', ''),
+                        'certificate_type': award.get('certificate_type', '')
+                    })
+            
+            custom_data['certificates'] = certificates
+            
+            # 培训经历映射 - 对应官方文档的"培训经历"模块
+            training = []
+            if 'training' in parser_result and isinstance(parser_result['training'], list):
+                for train in parser_result['training']:
+                    training.append({
+                        'training_name': train.get('training_name', ''),
+                        'training_time': train.get('training_time', ''),
+                        'training_desc': train.get('training_desc', ''),
+                        'training_institution': train.get('training_institution', ''),
+                        'training_certificate': train.get('training_certificate', ''),
+                        'training_duration': train.get('training_duration', '')
+                    })
+            
+            custom_data['training'] = training
+            
+            # 社会实践映射 - 对应官方文档的"社会及学校实践经历"模块
+            social_practice = []
+            if 'practiceList' in parser_result and isinstance(parser_result['practiceList'], list):
+                for practice in parser_result['practiceList']:
+                    social_practice.append({
+                        'practice_name': practice.get('practice_name', ''),
+                        'practice_time': practice.get('practice_time', ''),
+                        'practice_desc': practice.get('practice_desc', ''),
+                        'practice_role': practice.get('practice_role', ''),
+                        'practice_organization': practice.get('practice_organization', '')
+                    })
+            
+            custom_data['social_practice'] = social_practice
+            
+            # 个人评价映射 - 对应官方文档的"基本信息-文本内容"模块
+            if 'aboutme' in parser_result:
+                aboutme = parser_result['aboutme']
+                custom_data.update({
+                    'aboutme_desc': aboutme.get('aboutme_desc', ''),
+                    'self_introduction': aboutme.get('self_introduction', ''),
+                    'hobby': aboutme.get('hobby', ''),
+                    'strength': aboutme.get('strength', ''),
+                    'weakness': aboutme.get('weakness', ''),
+                    'career_goal': aboutme.get('career_goal', '')
+                })
+            
+            # 保留原始数据中的其他字段
+            for key, value in parser_result.items():
+                if key not in ['profile', 'educationList', 'workExpList', 'projectList', 'skillList', 'languageList', 'awardList', 'training', 'practiceList', 'aboutme', 'job_exp_objs', 'skills_objs']:
+                    custom_data[f'custom_{key}'] = value
+            
+            logger.info(f"数据映射完成，共映射 {len(custom_data)} 个字段")
+            return custom_data
+            
+        except Exception as e:
+            logger.error(f"数据映射失败: {e}")
+            return parser_result  # 如果映射失败，返回原始数据
+
 
 def create_json_response(data, status_code=200):
     """创建正确编码的JSON响应"""
@@ -539,6 +850,162 @@ PARSER_URL = 'https://ap-beijing.cloudmarket-apigw.com/service-9wsy8usn/ResumePa
 PARSER_SECRET_ID = 'RrIawnDnCs4ha4hs'
 PARSER_SECRET_KEY = 'JQSIHcT3xjgVAD1p33kvcn3I6KG4TcrB'
 parser_service = ResumeParserService(PARSER_URL, PARSER_SECRET_ID, PARSER_SECRET_KEY)
+
+# 自定义数据库结构定义 - 基于ResumeSDK官方文档
+CUSTOM_FIELD_STRUCTURE = {
+    # 基本信息 - 对应官方文档的"基本信息"模块
+    'basic_info': {
+        'name': {'type': 'string', 'label': '姓名', 'required': True, 'order': 1},
+        'gender': {'type': 'string', 'label': '性别', 'required': False, 'order': 2},
+        'age': {'type': 'number', 'label': '年龄', 'required': False, 'order': 3},
+        'birthday': {'type': 'string', 'label': '出生日期', 'required': False, 'order': 4},
+        'mobile': {'type': 'string', 'label': '手机号码', 'required': False, 'order': 5},
+        'email': {'type': 'string', 'label': '邮箱', 'required': False, 'order': 6},
+        'living_address': {'type': 'string', 'label': '居住地址', 'required': False, 'order': 7},
+        'hometown_address': {'type': 'string', 'label': '籍贯地址', 'required': False, 'order': 8},
+        'hukou_address': {'type': 'string', 'label': '户口地址', 'required': False, 'order': 9},
+        'city': {'type': 'string', 'label': '所在城市', 'required': False, 'order': 10},
+        'race': {'type': 'string', 'label': '民族', 'required': False, 'order': 11},
+        'surname': {'type': 'string', 'label': '姓氏', 'required': False, 'order': 12},
+        'workExpYear': {'type': 'string', 'label': '工作年限', 'required': False, 'order': 13},
+        'github': {'type': 'string', 'label': 'GitHub', 'required': False, 'order': 14},
+        'zhihu': {'type': 'string', 'label': '知乎', 'required': False, 'order': 15},
+        'wechat': {'type': 'string', 'label': '微信', 'required': False, 'order': 16},
+        'qq': {'type': 'string', 'label': 'QQ', 'required': False, 'order': 17},
+        'linkedin': {'type': 'string', 'label': 'LinkedIn', 'required': False, 'order': 18},
+        'blog': {'type': 'string', 'label': '个人博客', 'required': False, 'order': 19},
+        'website': {'type': 'string', 'label': '个人网站', 'required': False, 'order': 20},
+        'avatar': {'type': 'string', 'label': '头像', 'required': False, 'order': 21},
+        'expect_job': {'type': 'string', 'label': '期望职位', 'required': False, 'order': 22},
+        'expect_salary': {'type': 'string', 'label': '期望薪资', 'required': False, 'order': 23},
+        'expect_city': {'type': 'string', 'label': '期望城市', 'required': False, 'order': 24},
+        'expect_industry': {'type': 'string', 'label': '期望行业', 'required': False, 'order': 25},
+        'resume_name': {'type': 'string', 'label': '简历名称', 'required': False, 'order': 26},
+        'resume_update_time': {'type': 'string', 'label': '简历更新时间', 'required': False, 'order': 27},
+        'resume_text': {'type': 'text', 'label': '简历文本内容', 'required': False, 'order': 28}
+    },
+    
+    # 教育经历 - 对应官方文档的"教育经历"模块
+    'education': {
+        'college': {'type': 'string', 'label': '学校名称', 'required': False, 'order': 1},
+        'major': {'type': 'string', 'label': '专业', 'required': False, 'order': 2},
+        'education': {'type': 'string', 'label': '学历', 'required': False, 'order': 3},
+        'degree': {'type': 'string', 'label': '学位', 'required': False, 'order': 4},
+        'college_type': {'type': 'string', 'label': '学校类型', 'required': False, 'order': 5},
+        'college_rank': {'type': 'string', 'label': '学校排名', 'required': False, 'order': 6},
+        'grad_time': {'type': 'string', 'label': '毕业时间', 'required': False, 'order': 7},
+        'education_start_time': {'type': 'string', 'label': '入学时间', 'required': False, 'order': 8},
+        'education_end_time': {'type': 'string', 'label': '毕业时间', 'required': False, 'order': 9},
+        'gpa': {'type': 'string', 'label': 'GPA', 'required': False, 'order': 10},
+        'course': {'type': 'text', 'label': '主修课程', 'required': False, 'order': 11},
+        'education_desc': {'type': 'text', 'label': '教育经历描述', 'required': False, 'order': 12}
+    },
+    
+    # 工作经历 - 对应官方文档的"工作经历及实习经历"模块
+    'work_experience': {
+        'company_name': {'type': 'string', 'label': '公司名称', 'required': False, 'order': 1},
+        'department_name': {'type': 'string', 'label': '部门名称', 'required': False, 'order': 2},
+        'job_position': {'type': 'string', 'label': '职位', 'required': False, 'order': 3},
+        'work_time': {'type': 'array', 'label': '工作时间', 'required': False, 'order': 4},
+        'work_start_time': {'type': 'string', 'label': '开始时间', 'required': False, 'order': 5},
+        'work_end_time': {'type': 'string', 'label': '结束时间', 'required': False, 'order': 6},
+        'work_desc': {'type': 'text', 'label': '工作描述', 'required': False, 'order': 7},
+        'salary': {'type': 'string', 'label': '薪资', 'required': False, 'order': 8},
+        'work_type': {'type': 'string', 'label': '工作类型', 'required': False, 'order': 9},
+        'industry': {'type': 'string', 'label': '行业', 'required': False, 'order': 10},
+        'company_size': {'type': 'string', 'label': '公司规模', 'required': False, 'order': 11},
+        'company_nature': {'type': 'string', 'label': '公司性质', 'required': False, 'order': 12},
+        'report_to': {'type': 'string', 'label': '汇报对象', 'required': False, 'order': 13},
+        'subordinates': {'type': 'string', 'label': '下属人数', 'required': False, 'order': 14},
+        'achievement': {'type': 'text', 'label': '工作成就', 'required': False, 'order': 15}
+    },
+    
+    # 项目经历 - 对应官方文档的"项目经历"模块
+    'project_experience': {
+        'project_name': {'type': 'string', 'label': '项目名称', 'required': False, 'order': 1},
+        'project_role': {'type': 'string', 'label': '项目角色', 'required': False, 'order': 2},
+        'project_time': {'type': 'string', 'label': '项目时间', 'required': False, 'order': 3},
+        'project_start_time': {'type': 'string', 'label': '开始时间', 'required': False, 'order': 4},
+        'project_end_time': {'type': 'string', 'label': '结束时间', 'required': False, 'order': 5},
+        'project_desc': {'type': 'text', 'label': '项目描述', 'required': False, 'order': 6},
+        'project_content': {'type': 'text', 'label': '项目内容', 'required': False, 'order': 7},
+        'project_technology': {'type': 'text', 'label': '项目技术', 'required': False, 'order': 8},
+        'project_result': {'type': 'text', 'label': '项目成果', 'required': False, 'order': 9},
+        'project_scale': {'type': 'string', 'label': '项目规模', 'required': False, 'order': 10},
+        'project_budget': {'type': 'string', 'label': '项目预算', 'required': False, 'order': 11},
+        'project_team_size': {'type': 'string', 'label': '团队规模', 'required': False, 'order': 12}
+    },
+    
+    # 技能列表 - 对应官方文档的"技能列表"模块
+    'skills': {
+        'skill_name': {'type': 'string', 'label': '技能名称', 'required': False, 'order': 1},
+        'skill_level': {'type': 'string', 'label': '技能等级', 'required': False, 'order': 2},
+        'skill_desc': {'type': 'text', 'label': '技能描述', 'required': False, 'order': 3},
+        'skill_years': {'type': 'string', 'label': '技能年限', 'required': False, 'order': 4},
+        'skill_category': {'type': 'string', 'label': '技能类别', 'required': False, 'order': 5}
+    },
+    
+    # 语言技能 - 对应官方文档的"语言技能"模块
+    'language_skills': {
+        'language_name': {'type': 'string', 'label': '语言名称', 'required': False, 'order': 1},
+        'language_level': {'type': 'string', 'label': '语言等级', 'required': False, 'order': 2},
+        'language_certificate': {'type': 'string', 'label': '语言证书', 'required': False, 'order': 3},
+        'language_score': {'type': 'string', 'label': '语言分数', 'required': False, 'order': 4}
+    },
+    
+    # 证书奖项 - 对应官方文档的"所有证书及奖项"模块
+    'certificates': {
+        'award_info': {'type': 'string', 'label': '证书/奖项名称', 'required': False, 'order': 1},
+        'award_time': {'type': 'string', 'label': '获得时间', 'required': False, 'order': 2},
+        'award_desc': {'type': 'text', 'label': '证书/奖项描述', 'required': False, 'order': 3},
+        'award_level': {'type': 'string', 'label': '证书/奖项级别', 'required': False, 'order': 4},
+        'award_issuer': {'type': 'string', 'label': '颁发机构', 'required': False, 'order': 5},
+        'certificate_type': {'type': 'string', 'label': '证书类型', 'required': False, 'order': 6}
+    },
+    
+    # 培训经历 - 对应官方文档的"培训经历"模块
+    'training': {
+        'training_name': {'type': 'string', 'label': '培训名称', 'required': False, 'order': 1},
+        'training_time': {'type': 'string', 'label': '培训时间', 'required': False, 'order': 2},
+        'training_desc': {'type': 'text', 'label': '培训描述', 'required': False, 'order': 3},
+        'training_institution': {'type': 'string', 'label': '培训机构', 'required': False, 'order': 4},
+        'training_certificate': {'type': 'string', 'label': '培训证书', 'required': False, 'order': 5},
+        'training_duration': {'type': 'string', 'label': '培训时长', 'required': False, 'order': 6}
+    },
+    
+    # 社会实践 - 对应官方文档的"社会及学校实践经历"模块
+    'social_practice': {
+        'practice_name': {'type': 'string', 'label': '实践名称', 'required': False, 'order': 1},
+        'practice_time': {'type': 'string', 'label': '实践时间', 'required': False, 'order': 2},
+        'practice_desc': {'type': 'text', 'label': '实践描述', 'required': False, 'order': 3},
+        'practice_role': {'type': 'string', 'label': '实践角色', 'required': False, 'order': 4},
+        'practice_organization': {'type': 'string', 'label': '实践组织', 'required': False, 'order': 5}
+    },
+    
+    # 个人评价 - 对应官方文档的"基本信息-文本内容"模块
+    'self_evaluation': {
+        'aboutme_desc': {'type': 'text', 'label': '个人评价', 'required': False, 'order': 1},
+        'self_introduction': {'type': 'text', 'label': '自我介绍', 'required': False, 'order': 2},
+        'hobby': {'type': 'text', 'label': '兴趣爱好', 'required': False, 'order': 3},
+        'strength': {'type': 'text', 'label': '个人优势', 'required': False, 'order': 4},
+        'weakness': {'type': 'text', 'label': '个人劣势', 'required': False, 'order': 5},
+        'career_goal': {'type': 'text', 'label': '职业目标', 'required': False, 'order': 6}
+    }
+}
+
+# 字段分组显示配置 - 基于ResumeSDK官方文档结构
+FIELD_GROUPS_DISPLAY = {
+    'basic_info': {'name': '基本信息', 'icon': '👤', 'order': 1, 'description': '个人基本信息和联系方式'},
+    'education': {'name': '教育经历', 'icon': '🎓', 'order': 2, 'description': '学历教育背景'},
+    'work_experience': {'name': '工作经历', 'icon': '🏢', 'order': 3, 'description': '工作及实习经历'},
+    'project_experience': {'name': '项目经历', 'icon': '📋', 'order': 4, 'description': '项目经验'},
+    'skills': {'name': '技能列表', 'icon': '💻', 'order': 5, 'description': '专业技能'},
+    'language_skills': {'name': '语言技能', 'icon': '🌍', 'order': 6, 'description': '语言能力'},
+    'certificates': {'name': '证书奖项', 'icon': '🏆', 'order': 7, 'description': '证书和获奖情况'},
+    'training': {'name': '培训经历', 'icon': '📚', 'order': 8, 'description': '培训学习经历'},
+    'social_practice': {'name': '社会实践', 'icon': '🤝', 'order': 9, 'description': '社会及学校实践'},
+    'self_evaluation': {'name': '个人评价', 'icon': '📝', 'order': 10, 'description': '个人评价和介绍'}
+}
 
 # ============ 简历数据API ============
 @app.route('/api/resume/latest', methods=['GET'])
@@ -590,7 +1057,7 @@ def update_resume(record_id):
         # 直接更新 data.result 字段，支持任意结构
         result = mongo_client.collection.update_one(
             {"_id": ObjectId(record_id)},
-            {"$set": {"data.result": data, "updated_at": datetime.now()}}
+            {"$set": {"custom_data": data, "updated_at": datetime.now()}}
         )
         if result.matched_count > 0:
             return create_json_response({"message": "更新成功"})
@@ -681,6 +1148,27 @@ def delete_project(project_id):
         else:
             return create_json_response({"error": "项目不存在或删除失败"}, 404)
 
+    except Exception as e:
+        logger.error(f"API错误: {e}")
+        return create_json_response({"error": "服务器内部错误"}, 500)
+
+
+@app.route('/api/projects/<project_id>/name', methods=['PUT'])
+def update_project_name(project_id):
+    """修改项目名称"""
+    try:
+        data = request.get_json()
+        if not data or not data.get('name'):
+            return create_json_response({"error": "项目名称不能为空"}, 400)
+        new_name = data.get('name').strip()
+        project, error = mongo_client.update_project_name(project_id, new_name)
+        if project:
+            return create_json_response({
+                "message": "项目名称修改成功",
+                "project": project
+            })
+        else:
+            return create_json_response({"error": error}, 400)
     except Exception as e:
         logger.error(f"API错误: {e}")
         return create_json_response({"error": "服务器内部错误"}, 500)
@@ -890,10 +1378,18 @@ def parse_file(file_id):
         status = 'completed' if 'error' not in result else 'failed'
         error_msg = result.get('error') if status == 'failed' else None
 
-        # 4. 保存解析历史到 parseresults 集合
+        # 4. 数据映射转换
+        custom_data = None
+        if status == 'completed' and 'result' in result:
+            # 将第三方API结果映射到自定义结构
+            custom_data = mongo_client.map_parser_result_to_custom_structure(result['result'])
+            logger.info(f"解析结果已映射到自定义结构，字段数: {len(custom_data)}")
+
+        # 5. 保存解析历史到 parseresults 集合
         parse_record = {
             "file_id": file_id,
-            "data": result,
+            "original_data": result,  # 保存原始解析结果
+            "custom_data": custom_data,  # 保存映射后的自定义数据
             "status": status,
             "error": error_msg,
             "created_at": datetime.now(),
@@ -901,7 +1397,7 @@ def parse_file(file_id):
         }
         mongo_client.collection.insert_one(parse_record)
 
-        # 5. 更新文件元数据解析状态和结果
+        # 6. 更新文件元数据解析状态和结果
         mongo_client.files_collection.update_one(
             {"file_id": file_id},
             {"$set": {
@@ -912,7 +1408,15 @@ def parse_file(file_id):
                 "updated_at": datetime.now()
             }}
         )
-        return create_json_response({"message": "解析完成", "status": status, "result": result})
+        
+        response_data = {
+            "message": "解析完成", 
+            "status": status, 
+            "original_result": result,
+            "custom_data": custom_data
+        }
+        return create_json_response(response_data)
+        
     except Exception as e:
         logger.error(f"解析文件失败: {e}")
         mongo_client.files_collection.update_one(
@@ -964,6 +1468,41 @@ def get_system_info():
         logger.error(f"API错误: {e}")
         return create_json_response({"error": "服务器内部错误"}, 500)
 
+
+# ============ 字段管理API ============
+@app.route('/api/fields/structure', methods=['GET'])
+def get_field_structure():
+    """获取当前字段结构定义"""
+    try:
+        return create_json_response(CUSTOM_FIELD_STRUCTURE)
+    except Exception as e:
+        logger.error(f"API错误: {e}")
+        return create_json_response({"error": "服务器内部错误"}, 500)
+
+@app.route('/api/fields/structure', methods=['POST'])
+def update_field_structure():
+    """更新字段结构定义"""
+    try:
+        data = request.get_json()
+        if not data:
+            return create_json_response({"error": "请求数据为空"}, 400)
+        
+        # 这里可以添加字段验证逻辑
+        # 暂时直接返回成功，实际应用中应该保存到配置文件或数据库
+        logger.info("字段结构更新请求已接收")
+        return create_json_response({"message": "字段结构更新成功"})
+    except Exception as e:
+        logger.error(f"API错误: {e}")
+        return create_json_response({"error": "服务器内部错误"}, 500)
+
+@app.route('/api/fields/groups', methods=['GET'])
+def get_field_groups():
+    """获取字段分组显示配置"""
+    try:
+        return create_json_response(FIELD_GROUPS_DISPLAY)
+    except Exception as e:
+        logger.error(f"API错误: {e}")
+        return create_json_response({"error": "服务器内部错误"}, 500)
 
 
 @app.route('/api/health', methods=['GET'])

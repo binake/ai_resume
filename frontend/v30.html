@@ -512,29 +512,80 @@
         let currentCategoryFiles = {}; // 存储各类别的文件列表
         let currentProjectFiles = []; // 存储当前项目的文件列表
 
-        // 字段分组定义 - 按照用户提供的JSON结构重新定义
-        const FIELD_GROUPS = {
-            'profile': ['name', 'email', 'phone', 'mobile', 'github', 'zhihu', 'workExpYear', 'living_address', 'birthday', 'hometown_address', 'race', 'surname', 'hukou_address', 'city', 'gender', 'age'],
-            'educationList': ['college', 'major', 'education', 'degree', 'college_type', 'college_rank', 'grad_time'],
-            'workExpList': ['work_year', 'work_year_inf', 'work_start_time', 'work_start_time_inf', 'work_position', 'work_position_p', 'work_company', 'expect_job'],
-            'projectList': ['project_name', 'project_role', 'project_time', 'project_desc', 'project_content'],
-            'skillList': ['skills_objs'],
-            'awardList': ['award_info', 'award_time'],
-            'workList': ['work_name', 'work_desc', 'work_link'],
-            'aboutme': ['aboutme_desc', 'self_introduction']
-        };
+        // 字段分组定义 - 使用后端返回的自定义结构
+        let FIELD_GROUPS = {};
+        let FIELD_STRUCTURE = {};
+        let FIELD_GROUPS_DISPLAY = {};
 
         // 分组名称映射（用于显示中文名称）
-        const GROUP_NAME_MAP = {
-            'profile': '基本信息',
-            'educationList': '教育背景',
-            'workExpList': '工作经历',
-            'projectList': '项目经验',
-            'skillList': '个人技能',
-            'awardList': '更多信息',
-            'workList': '个人作品',
-            'aboutme': '个人评价'
-        };
+        let GROUP_NAME_MAP = {};
+
+        // 初始化字段结构
+        async function initializeFieldStructure() {
+            try {
+                // 获取字段结构定义
+                const structureResponse = await fetch(`${API_BASE_URL}/fields/structure`);
+                if (structureResponse.ok) {
+                    FIELD_STRUCTURE = await structureResponse.json();
+                    
+                    // 构建字段分组
+                    for (const [groupKey, fields] of Object.entries(FIELD_STRUCTURE)) {
+                        FIELD_GROUPS[groupKey] = Object.keys(fields);
+                    }
+                }
+
+                // 获取字段分组显示配置
+                const groupsResponse = await fetch(`${API_BASE_URL}/fields/groups`);
+                if (groupsResponse.ok) {
+                    FIELD_GROUPS_DISPLAY = await groupsResponse.json();
+                    
+                    // 构建分组名称映射
+                    for (const [groupKey, config] of Object.entries(FIELD_GROUPS_DISPLAY)) {
+                        GROUP_NAME_MAP[groupKey] = config.name;
+                    }
+                }
+
+                console.log('字段结构初始化完成:', {
+                    FIELD_STRUCTURE,
+                    FIELD_GROUPS,
+                    FIELD_GROUPS_DISPLAY,
+                    GROUP_NAME_MAP
+                });
+            } catch (error) {
+                console.error('字段结构初始化失败:', error);
+                // 使用默认结构作为后备
+                initializeDefaultFieldStructure();
+            }
+        }
+
+        // 默认字段结构（作为后备）- 基于ResumeSDK官方文档
+        function initializeDefaultFieldStructure() {
+            FIELD_GROUPS = {
+                'basic_info': ['name', 'gender', 'age', 'birthday', 'mobile', 'email', 'living_address', 'hometown_address', 'hukou_address', 'city', 'race', 'surname', 'workExpYear', 'github', 'zhihu', 'wechat', 'qq', 'linkedin', 'blog', 'website', 'avatar', 'expect_job', 'expect_salary', 'expect_city', 'expect_industry', 'resume_name', 'resume_update_time', 'resume_text'],
+                'education': ['college', 'major', 'education', 'degree', 'college_type', 'college_rank', 'grad_time', 'education_start_time', 'education_end_time', 'gpa', 'course', 'education_desc'],
+                'work_experience': ['company_name', 'department_name', 'job_position', 'work_time', 'work_start_time', 'work_end_time', 'work_desc', 'salary', 'work_type', 'industry', 'company_size', 'company_nature', 'report_to', 'subordinates', 'achievement'],
+                'project_experience': ['project_name', 'project_role', 'project_time', 'project_start_time', 'project_end_time', 'project_desc', 'project_content', 'project_technology', 'project_result', 'project_scale', 'project_budget', 'project_team_size'],
+                'skills': ['skill_name', 'skill_level', 'skill_desc', 'skill_years', 'skill_category'],
+                'language_skills': ['language_name', 'language_level', 'language_certificate', 'language_score'],
+                'certificates': ['award_info', 'award_time', 'award_desc', 'award_level', 'award_issuer', 'certificate_type'],
+                'training': ['training_name', 'training_time', 'training_desc', 'training_institution', 'training_certificate', 'training_duration'],
+                'social_practice': ['practice_name', 'practice_time', 'practice_desc', 'practice_role', 'practice_organization'],
+                'self_evaluation': ['aboutme_desc', 'self_introduction', 'hobby', 'strength', 'weakness', 'career_goal']
+            };
+
+            GROUP_NAME_MAP = {
+                'basic_info': '基本信息',
+                'education': '教育经历',
+                'work_experience': '工作经历',
+                'project_experience': '项目经历',
+                'skills': '技能列表',
+                'language_skills': '语言技能',
+                'certificates': '证书奖项',
+                'training': '培训经历',
+                'social_practice': '社会实践',
+                'self_evaluation': '个人评价'
+            };
+        }
 
         // 文件类别映射
         const FILE_CATEGORIES = {
@@ -563,6 +614,9 @@
         });
 
         async function initializeApp() {
+            // 首先初始化字段结构
+            await initializeFieldStructure();
+            
             setupEventListeners();
             await loadProjects();
             await loadData();
@@ -812,13 +866,13 @@
                 projectElement.setAttribute('data-project', project._id);
                 projectElement.innerHTML = `
                     <div class="project-dot"></div>
-                    <span title="${project.description || project.name}">${project.name}</span>
+                    <span id="sidebarProjectNameDisplay-${project._id}" title="${project.description || project.name}">${project.name}</span>
+                    <input id="sidebarProjectNameInput-${project._id}" type="text" value="${project.name}" style="display:none; padding:2px 6px; font-size:14px; border:1px solid #dadce0; border-radius:4px; min-width:60px; margin-left:4px;" onkeydown="handleSidebarProjectNameEdit(event, '${project._id}')" />
+                    <button class="btn-small" style="margin-left:4px;" onclick="showSidebarProjectNameEdit('${project._id}');event.stopPropagation();">编辑</button>
                 `;
-
                 projectElement.addEventListener('click', function() {
                     switchProject(project._id);
                 });
-
                 projectsSection.insertBefore(projectElement, addProjectElement);
             });
 
@@ -1700,6 +1754,15 @@ async function parseFile(fileId, filename) {
             const resume = allResumes.find(r => r._id === id);
             if (!resume) return;
 
+            // 添加调试信息
+            console.log('=== 查看详情调试信息 ===');
+            console.log('简历ID:', id);
+            console.log('简历数据:', resume);
+            console.log('字段结构:', FIELD_STRUCTURE);
+            console.log('字段分组:', FIELD_GROUPS);
+            console.log('字段分组显示:', FIELD_GROUPS_DISPLAY);
+            console.log('简历字段列表:', Object.keys(resume));
+
             // 左右分栏布局：左侧预览，右侧操作
             const modalContent = `
                 <div style="display: flex; gap: 20px; height: 80vh;">
@@ -1712,25 +1775,27 @@ async function parseFile(fileId, filename) {
                     <!-- 右侧操作区域 -->
                     <div style="width: 300px; display: flex; flex-direction: column; gap: 15px;">
                         <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <h4 style="margin-bottom: 15px; color: #1a73e8;">字段统计</h4>
+                            <div style="font-size: 14px; color: #5f6368;">
+                                <div>总字段数: ${Object.keys(resume).length}</div>
+                                <div>基本信息: ${Object.keys(resume).filter(k => FIELD_GROUPS['basic_info'] && FIELD_GROUPS['basic_info'].includes(k)).length}</div>
+                                <div>教育背景: ${Object.keys(resume).filter(k => FIELD_GROUPS['education'] && FIELD_GROUPS['education'].includes(k)).length}</div>
+                                <div>工作经历: ${Object.keys(resume).filter(k => FIELD_GROUPS['work_experience'] && FIELD_GROUPS['work_experience'].includes(k)).length}</div>
+                                <div>项目经验: ${Object.keys(resume).filter(k => FIELD_GROUPS['project_experience'] && FIELD_GROUPS['project_experience'].includes(k)).length}</div>
+                                <div>个人技能: ${Object.keys(resume).filter(k => FIELD_GROUPS['skills'] && FIELD_GROUPS['skills'].includes(k)).length}</div>
+                                <div>语言技能: ${Object.keys(resume).filter(k => FIELD_GROUPS['language_skills'] && FIELD_GROUPS['language_skills'].includes(k)).length}</div>
+                                <div>证书奖项: ${Object.keys(resume).filter(k => FIELD_GROUPS['certificates'] && FIELD_GROUPS['certificates'].includes(k)).length}</div>
+                                <div>培训经历: ${Object.keys(resume).filter(k => FIELD_GROUPS['training'] && FIELD_GROUPS['training'].includes(k)).length}</div>
+                                <div>社会实践: ${Object.keys(resume).filter(k => FIELD_GROUPS['social_practice'] && FIELD_GROUPS['social_practice'].includes(k)).length}</div>
+                                <div>个人评价: ${Object.keys(resume).filter(k => FIELD_GROUPS['self_evaluation'] && FIELD_GROUPS['self_evaluation'].includes(k)).length}</div>
+                                <div>自定义字段: ${Object.keys(resume).filter(k => !Object.values(FIELD_GROUPS).flat().includes(k)).length}</div>
+                            </div>
+                        </div>
+                        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                             <h4 style="margin-bottom: 15px; color: #1a73e8;">操作</h4>
                             <button class="action-btn" onclick="editResume('${id}')" style="width: 100%; margin-bottom: 10px;">✏️ 编辑简历</button>
                             <button class="action-btn secondary" onclick="exportResume('${id}')" style="width: 100%; margin-bottom: 10px;">📄 导出数据</button>
                             <button class="action-btn danger" onclick="deleteResume('${id}')" style="width: 100%;">🗑️ 删除简历</button>
-                        </div>
-                        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                            <h4 style="margin-bottom: 15px; color: #1a73e8;">字段统计</h4>
-                            <div style="font-size: 14px; color: #5f6368;">
-                                <div>总字段数: ${Object.keys(resume).length}</div>
-                                <div>基本信息: ${Object.keys(resume).filter(k => FIELD_GROUPS['profile'].includes(k)).length}</div>
-                                <div>教育背景: ${Object.keys(resume).filter(k => FIELD_GROUPS['educationList'].includes(k)).length}</div>
-                                <div>工作经历: ${Object.keys(resume).filter(k => FIELD_GROUPS['workExpList'].includes(k)).length}</div>
-                                <div>项目经验: ${Object.keys(resume).filter(k => FIELD_GROUPS['projectList'].includes(k)).length}</div>
-                                <div>个人技能: ${Object.keys(resume).filter(k => FIELD_GROUPS['skillList'].includes(k)).length}</div>
-                                <div>更多信息: ${Object.keys(resume).filter(k => FIELD_GROUPS['awardList'].includes(k)).length}</div>
-                                <div>个人作品: ${Object.keys(resume).filter(k => FIELD_GROUPS['workList'].includes(k)).length}</div>
-                                <div>个人评价: ${Object.keys(resume).filter(k => FIELD_GROUPS['aboutme'].includes(k)).length}</div>
-                                <div>自定义字段: ${Object.keys(resume).filter(k => !Object.values(FIELD_GROUPS).flat().includes(k)).length}</div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -1741,7 +1806,7 @@ async function parseFile(fileId, filename) {
             document.getElementById('detailModal').style.display = 'flex';
         }
 
-        // 生成简历预览（参考 visiky 设计，按照新的JSON结构）
+        // 生成简历预览（使用自定义数据结构）
         function generateResumePreview(resume) {
             return `
                 <!-- 个人信息头部 -->
@@ -1757,162 +1822,245 @@ async function parseFile(fileId, filename) {
                     </div>
                 </div>
 
-                <!-- Profile 基本信息 -->
-                ${generateProfileSection(resume)}
-                
-                <!-- 个人评价 -->
-                ${generateAboutmeSection(resume)}
-                
-                <!-- 教育背景 -->
-                ${generateEducationListSection(resume)}
-                
-                <!-- 工作经历 -->
-                ${generateWorkExpListSection(resume)}
-                
-                <!-- 项目经验 -->
-                ${generateProjectListSection(resume)}
-                
-                <!-- 个人技能 -->
-                ${generateSkillListSection(resume)}
-                
-                <!-- 更多信息 -->
-                ${generateAwardListSection(resume)}
-                
-                <!-- 个人作品 -->
-                ${generateWorkListSection(resume)}
-                
-                <!-- 其他信息（未分组的字段） -->
-                ${generateOtherInfoSection(resume)}
+                ${generateAllSections(resume)}
             `;
         }
 
-        function generateProfileSection(resume) {
-            const profileFields = ['name', 'email', 'phone', 'mobile', 'github', 'zhihu', 'workExpYear', 'living_address', 'birthday', 'hometown_address', 'race', 'surname', 'hukou_address', 'city', 'gender', 'age'];
-            const hasProfileInfo = profileFields.some(field => resume[field]);
+        // 生成所有分组内容
+        function generateAllSections(resume) {
+            let html = '';
             
-            if (!hasProfileInfo) return '';
+            console.log('=== generateAllSections 调试信息 ===');
+            console.log('简历数据:', resume);
+            console.log('FIELD_GROUPS_DISPLAY:', FIELD_GROUPS_DISPLAY);
             
-            let html = '<div style="margin-bottom: 30px;"><h3 style="color: #1a73e8; margin-bottom: 15px;">👤 基本信息</h3>';
-            profileFields.forEach(field => {
-                if (resume[field]) {
-                    html += `<div style="margin-bottom: 8px;"><strong>${field}:</strong> ${resume[field]}</div>`;
+            // 按分组顺序生成内容
+            const sortedGroups = Object.entries(FIELD_GROUPS_DISPLAY)
+                .sort((a, b) => a[1].order - b[1].order);
+            
+            console.log('排序后的分组:', sortedGroups);
+            
+            for (const [groupKey, groupConfig] of sortedGroups) {
+                console.log(`处理分组: ${groupKey}`, groupConfig);
+                const sectionHtml = generateSectionByGroup(groupKey, resume);
+                console.log(`分组 ${groupKey} 生成的HTML:`, sectionHtml ? '有内容' : '无内容');
+                if (sectionHtml) {
+                    html += sectionHtml;
                 }
-            });
-            html += '</div>';
+            }
+            
+            // 生成未分组字段
+            const otherFieldsHtml = generateOtherFieldsSection(resume);
+            if (otherFieldsHtml) {
+                html += otherFieldsHtml;
+            }
+            
+            console.log('最终生成的HTML长度:', html.length);
             return html;
         }
 
-        function generateAboutmeSection(resume) {
-            const aboutmeFields = ['aboutme_desc', 'self_introduction'];
-            const hasAboutmeInfo = aboutmeFields.some(field => resume[field]);
+        // 根据分组生成内容
+        function generateSectionByGroup(groupKey, resume) {
+            const groupConfig = FIELD_GROUPS_DISPLAY[groupKey];
+            const fields = FIELD_GROUPS[groupKey] || [];
             
-            if (!hasAboutmeInfo) return '';
+            console.log(`=== generateSectionByGroup 调试信息 (${groupKey}) ===`);
+            console.log('groupConfig:', groupConfig);
+            console.log('fields:', fields);
             
-            let html = '<div style="margin-bottom: 30px;"><h3 style="color: #1a73e8; margin-bottom: 15px;">📝 个人评价</h3>';
-            aboutmeFields.forEach(field => {
-                if (resume[field]) {
-                    html += `<div style="margin-bottom: 8px;"><strong>${field}:</strong> ${resume[field]}</div>`;
-                }
-            });
+            if (!groupConfig) {
+                console.log(`分组 ${groupKey} 没有配置，跳过`);
+                return '';
+            }
+            
+            // 检查是否有数据
+            const hasData = fields.some(field => resume[field] !== undefined && resume[field] !== null && resume[field] !== '');
+            console.log(`分组 ${groupKey} 普通字段有数据:`, hasData);
+            
+            // 对于数组类型的字段，检查是否有数据
+            const arrayFields = ['work_experience', 'project_experience', 'skills', 'language_skills', 'certificates', 'training', 'social_practice'];
+            const hasArrayData = arrayFields.includes(groupKey) && Array.isArray(resume[groupKey]) && resume[groupKey].length > 0;
+            console.log(`分组 ${groupKey} 数组字段有数据:`, hasArrayData, resume[groupKey]);
+            
+            if (!hasData && !hasArrayData) {
+                console.log(`分组 ${groupKey} 没有数据，跳过`);
+                return '';
+            }
+            
+            let html = `<div style="margin-bottom: 30px;"><h3 style="color: #1a73e8; margin-bottom: 15px;">${groupConfig.icon} ${groupConfig.name}</h3>`;
+            
+            // 根据分组类型生成不同的内容
+            switch (groupKey) {
+                case 'work_experience':
+                    html += generateWorkExperienceSection(resume.work_experience);
+                    break;
+                case 'project_experience':
+                    html += generateProjectExperienceSection(resume.project_experience);
+                    break;
+                case 'skills':
+                    html += generateSkillsSection(resume.skills);
+                    break;
+                case 'language_skills':
+                    html += generateLanguageSkillsSection(resume.language_skills);
+                    break;
+                case 'certificates':
+                    html += generateCertificatesSection(resume.certificates);
+                    break;
+                case 'training':
+                    html += generateTrainingSection(resume.training);
+                    break;
+                case 'social_practice':
+                    html += generateSocialPracticeSection(resume.social_practice);
+                    break;
+                default:
+                    // 普通字段组
+                    html += generateSimpleFieldsSection(fields, resume);
+                    break;
+            }
+            
             html += '</div>';
+            console.log(`分组 ${groupKey} 最终HTML长度:`, html.length);
             return html;
         }
 
-        function generateEducationListSection(resume) {
-            const eduFields = ['college', 'major', 'education', 'degree', 'college_type', 'college_rank', 'grad_time'];
-            const hasEducation = eduFields.some(field => resume[field]);
-            
-            if (!hasEducation) return '';
-            
-            let html = '<div style="margin-bottom: 30px;"><h3 style="color: #1a73e8; margin-bottom: 15px;">🎓 教育背景</h3>';
-            eduFields.forEach(field => {
-                if (resume[field]) {
-                    html += `<div style="margin-bottom: 8px;"><strong>${field}:</strong> ${resume[field]}</div>`;
+        // 生成简单字段组
+        function generateSimpleFieldsSection(fields, resume) {
+            let html = '';
+            fields.forEach(field => {
+                if (resume[field] !== undefined && resume[field] !== null && resume[field] !== '') {
+                    const fieldConfig = getFieldConfig(field);
+                    const label = fieldConfig ? fieldConfig.label : field;
+                    html += `<div style="margin-bottom: 8px;"><strong>${label}:</strong> ${resume[field]}</div>`;
                 }
             });
-            html += '</div>';
             return html;
         }
 
-        function generateWorkExpListSection(resume) {
-            const workFields = ['work_year', 'work_year_inf', 'work_start_time', 'work_start_time_inf', 'work_position', 'work_position_p', 'work_company', 'expect_job'];
-            const hasWorkInfo = workFields.some(field => resume[field]);
-            
-            if (!hasWorkInfo) return '';
-            
-            let html = '<div style="margin-bottom: 30px;"><h3 style="color: #1a73e8; margin-bottom: 15px;">💼 工作经历</h3>';
-            workFields.forEach(field => {
-                if (resume[field]) {
-                    html += `<div style="margin-bottom: 8px;"><strong>${field}:</strong> ${resume[field]}</div>`;
+        // 获取字段配置
+        function getFieldConfig(fieldName) {
+            for (const [groupKey, fields] of Object.entries(FIELD_STRUCTURE)) {
+                if (fields[fieldName]) {
+                    return fields[fieldName];
                 }
-            });
-            html += '</div>';
-            return html;
+            }
+            return null;
         }
 
-        function generateProjectListSection(resume) {
-            const projectFields = ['project_name', 'project_role', 'project_time', 'project_desc', 'project_content'];
-            const hasProjectInfo = projectFields.some(field => resume[field]);
+        // 生成工作经历部分
+        function generateWorkExperienceSection(workExperience) {
+            if (!Array.isArray(workExperience) || workExperience.length === 0) return '';
             
-            if (!hasProjectInfo) return '';
-            
-            let html = '<div style="margin-bottom: 30px;"><h3 style="color: #1a73e8; margin-bottom: 15px;">🏢 项目经验</h3>';
-            projectFields.forEach(field => {
-                if (resume[field]) {
-                    html += `<div style="margin-bottom: 8px;"><strong>${field}:</strong> ${resume[field]}</div>`;
-                }
-            });
-            html += '</div>';
-            return html;
+            return workExperience.map(work => `
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #34a853;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div style="font-weight: 600; color: #202124;">${work.job_position || '职位未填写'}</div>
+                        <span style="background: #34a853; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">工作</span>
+                    </div>
+                    <div style="color: #5f6368; margin-bottom: 8px;">🏢 ${work.company_name || '公司未填写'}</div>
+                    ${work.department_name ? `<div style="color: #5f6368; margin-bottom: 8px;">🏢 ${work.department_name}</div>` : ''}
+                    <div style="color: #5f6368; margin-bottom: 8px; font-size: 12px;">📅 ${work.work_start_time || ''} - ${work.work_end_time || ''}</div>
+                    ${work.salary ? `<div style="color: #5f6368; margin-bottom: 8px;">💰 ${work.salary}</div>` : ''}
+                    ${work.industry ? `<div style="color: #5f6368; margin-bottom: 8px;">🏭 ${work.industry}</div>` : ''}
+                    ${work.work_desc ? `<div style="line-height: 1.6; color: #202124;">${work.work_desc}</div>` : ''}
+                    ${work.achievement ? `<div style="line-height: 1.6; color: #202124; margin-top: 8px;"><strong>工作成就:</strong> ${work.achievement}</div>` : ''}
+                </div>
+            `).join('');
         }
 
-        function generateSkillListSection(resume) {
-            const skills = Array.isArray(resume.skills_objs) ? resume.skills_objs : [];
-            const hasSkills = skills.length > 0;
+        // 生成项目经验部分
+        function generateProjectExperienceSection(projectExperience) {
+            if (!Array.isArray(projectExperience) || projectExperience.length === 0) return '';
             
-            if (!hasSkills) return '';
+            return projectExperience.map(project => `
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #1a73e8;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div style="font-weight: 600; color: #202124;">${project.project_name || '项目未填写'}</div>
+                        <span style="background: #1a73e8; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">项目</span>
+                    </div>
+                    <div style="color: #5f6368; margin-bottom: 8px;">👤 ${project.project_role || '角色未填写'}</div>
+                    <div style="color: #5f6368; margin-bottom: 8px; font-size: 12px;">📅 ${project.project_start_time || ''} - ${project.project_end_time || ''}</div>
+                    ${project.project_technology ? `<div style="color: #5f6368; margin-bottom: 8px;">💻 ${project.project_technology}</div>` : ''}
+                    ${project.project_scale ? `<div style="color: #5f6368; margin-bottom: 8px;">📊 ${project.project_scale}</div>` : ''}
+                    ${project.project_desc ? `<div style="line-height: 1.6; color: #202124; margin-bottom: 8px;">${project.project_desc}</div>` : ''}
+                    ${project.project_content ? `<div style="line-height: 1.6; color: #5f6368; font-size: 14px; margin-bottom: 8px;">${project.project_content}</div>` : ''}
+                    ${project.project_result ? `<div style="line-height: 1.6; color: #202124;"><strong>项目成果:</strong> ${project.project_result}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        // 生成技能部分
+        function generateSkillsSection(skills) {
+            if (!Array.isArray(skills) || skills.length === 0) return '';
             
-            let html = '<div style="margin-bottom: 30px;"><h3 style="color: #1a73e8; margin-bottom: 15px;">💻 个人技能</h3>';
-            html += `<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            return `<div style="display: flex; flex-wrap: wrap; gap: 8px;">
                 ${skills.map(skill => 
                     `<span style="background: #e8f0fe; color: #1a73e8; padding: 6px 12px; border-radius: 16px; font-size: 12px; border: 1px solid #dadce0;">
-                        ${skill.skills_name}${skill.skills_level ? ` - ${skill.skills_level}` : ''}
+                        ${skill.skill_name}${skill.skill_level ? ` - ${skill.skill_level}` : ''}${skill.skill_years ? ` (${skill.skill_years}年)` : ''}
                     </span>`
                 ).join('')}
             </div>`;
-            html += '</div>';
-            return html;
         }
 
-        function generateAwardListSection(resume) {
-            const awards = Array.isArray(resume.award_info) ? resume.award_info : [];
-            const hasAwards = awards.length > 0;
+        // 生成证书部分
+        function generateCertificatesSection(certificates) {
+            if (!Array.isArray(certificates) || certificates.length === 0) return '';
             
-            if (!hasAwards) return '';
-            
-            let html = '<div style="margin-bottom: 30px;"><h3 style="color: #1a73e8; margin-bottom: 15px;">🏆 更多信息</h3>';
-            awards.forEach(award => {
-                html += `<div style="margin-bottom: 8px;"><strong>奖项:</strong> ${award.award_name}</div>`;
-            });
-            html += '</div>';
-            return html;
+            return certificates.map(cert => `
+                <div style="background: #fff3e0; padding: 10px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid #ff9800;">
+                    <div style="font-weight: 600; color: #202124;">${cert.award_info || '证书未填写'}</div>
+                    <div style="color: #5f6368; font-size: 12px;">📅 ${cert.award_time || ''}</div>
+                    ${cert.award_level ? `<div style="color: #5f6368; font-size: 12px;">🏆 ${cert.award_level}</div>` : ''}
+                    ${cert.award_issuer ? `<div style="color: #5f6368; font-size: 12px;">🏛️ ${cert.award_issuer}</div>` : ''}
+                    ${cert.award_desc ? `<div style="color: #5f6368; margin-top: 4px;">${cert.award_desc}</div>` : ''}
+                </div>
+            `).join('');
         }
 
-        function generateWorkListSection(resume) {
-            const works = Array.isArray(resume.work_name) ? resume.work_name : [];
-            const hasWorks = works.length > 0;
+        // 生成培训部分
+        function generateTrainingSection(training) {
+            if (!Array.isArray(training) || training.length === 0) return '';
             
-            if (!hasWorks) return '';
-            
-            let html = '<div style="margin-bottom: 30px;"><h3 style="color: #1a73e8; margin-bottom: 15px;">💼 个人作品</h3>';
-            works.forEach(work => {
-                html += `<div style="margin-bottom: 8px;"><strong>作品:</strong> ${work.work_name}</div>`;
-            });
-            html += '</div>';
-            return html;
+            return training.map(train => `
+                <div style="background: #f3e5f5; padding: 10px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid #9c27b0;">
+                    <div style="font-weight: 600; color: #202124;">${train.training_name || '培训未填写'}</div>
+                    <div style="color: #5f6368; font-size: 12px;">📅 ${train.training_time || ''}</div>
+                    ${train.training_institution ? `<div style="color: #5f6368; font-size: 12px;">🏫 ${train.training_institution}</div>` : ''}
+                    ${train.training_duration ? `<div style="color: #5f6368; font-size: 12px;">⏱️ ${train.training_duration}</div>` : ''}
+                    ${train.training_desc ? `<div style="color: #5f6368; margin-top: 4px;">${train.training_desc}</div>` : ''}
+                </div>
+            `).join('');
         }
 
-        function generateOtherInfoSection(resume) {
+        // 生成语言技能部分
+        function generateLanguageSkillsSection(languageSkills) {
+            if (!Array.isArray(languageSkills) || languageSkills.length === 0) return '';
+            
+            return `<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                ${languageSkills.map(lang => 
+                    `<span style="background: #e8f5e8; color: #2e7d32; padding: 6px 12px; border-radius: 16px; font-size: 12px; border: 1px solid #c8e6c9;">
+                        ${lang.language_name}${lang.language_level ? ` - ${lang.language_level}` : ''}${lang.language_score ? ` (${lang.language_score})` : ''}
+                    </span>`
+                ).join('')}
+            </div>`;
+        }
+
+        // 生成社会实践部分
+        function generateSocialPracticeSection(socialPractice) {
+            if (!Array.isArray(socialPractice) || socialPractice.length === 0) return '';
+            
+            return socialPractice.map(practice => `
+                <div style="background: #f1f8e9; padding: 10px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid #8bc34a;">
+                    <div style="font-weight: 600; color: #202124;">${practice.practice_name || '实践未填写'}</div>
+                    <div style="color: #5f6368; font-size: 12px;">📅 ${practice.practice_time || ''}</div>
+                    ${practice.practice_role ? `<div style="color: #5f6368; font-size: 12px;">👤 ${practice.practice_role}</div>` : ''}
+                    ${practice.practice_organization ? `<div style="color: #5f6368; font-size: 12px;">🏢 ${practice.practice_organization}</div>` : ''}
+                    ${practice.practice_desc ? `<div style="color: #5f6368; margin-top: 4px;">${practice.practice_desc}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        // 生成未分组字段部分
+        function generateOtherFieldsSection(resume) {
             const allGrouped = new Set(Object.values(FIELD_GROUPS).flat());
             const otherFields = Object.entries(resume)
                 .filter(([key, value]) => !allGrouped.has(key) && value !== undefined && value !== null && value !== '')
@@ -2160,12 +2308,14 @@ async function parseFile(fileId, filename) {
                 <select style="padding:6px 8px;border:1px solid #dadce0;border-radius:4px;" name="group">
                     <option value="其他">其他</option>
                     <option value="基本信息">基本信息</option>
-                    <option value="教育背景">教育背景</option>
+                    <option value="教育经历">教育经历</option>
                     <option value="工作经历">工作经历</option>
-                    <option value="项目经验">项目经验</option>
-                    <option value="个人技能">个人技能</option>
-                    <option value="更多信息">更多信息</option>
-                    <option value="个人作品">个人作品</option>
+                    <option value="项目经历">项目经历</option>
+                    <option value="技能列表">技能列表</option>
+                    <option value="语言技能">语言技能</option>
+                    <option value="证书奖项">证书奖项</option>
+                    <option value="培训经历">培训经历</option>
+                    <option value="社会实践">社会实践</option>
                     <option value="个人评价">个人评价</option>
                 </select>
                 <button type="button" class="btn-small danger" onclick="removeField(this)">删除</button>
@@ -2241,7 +2391,11 @@ async function parseFile(fileId, filename) {
             listContainer.innerHTML = allProjects.map(project => `
                 <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px; border: 1px solid #e8eaed; border-radius: 6px; margin-bottom: 8px; ${project._id === currentProject ? 'background: #e8f0fe; border-color: #1a73e8;' : ''}">
                     <div style="flex: 1;">
-                        <div style="font-weight: 500; margin-bottom: 2px;">${project.name}</div>
+                        <div style="font-weight: 500; margin-bottom: 2px; display: flex; align-items: center; gap: 8px;">
+                            <span id="projectNameDisplay-${project._id}">${project.name}</span>
+                            <input id="projectNameInput-${project._id}" type="text" value="${project.name}" style="display:none; padding:2px 6px; font-size:14px; border:1px solid #dadce0; border-radius:4px; min-width:80px;" onkeydown="handleProjectNameEdit(event, '${project._id}')" />
+                            <button class="btn-small" onclick="showProjectNameEdit('${project._id}')">编辑名称</button>
+                        </div>
                         <div style="font-size: 12px; color: #5f6368;">${project.description || '暂无描述'}</div>
                         <div style="font-size: 11px; color: #5f6368; margin-top: 2px;">创建时间: ${formatDate(project.created_at)}</div>
                     </div>
@@ -2464,6 +2618,88 @@ async function parseFile(fileId, filename) {
                 refreshData();
             }
         });
+
+        function showProjectNameEdit(projectId) {
+            document.getElementById(`projectNameDisplay-${projectId}`).style.display = 'none';
+            const input = document.getElementById(`projectNameInput-${projectId}`);
+            input.style.display = 'inline-block';
+            input.focus();
+            input.select();
+        }
+
+        async function handleProjectNameEdit(event, projectId) {
+            const input = document.getElementById(`projectNameInput-${projectId}`);
+            if (event.key === 'Enter') {
+                const newName = input.value.trim();
+                if (!newName) {
+                    showMessage('项目名称不能为空', 'error');
+                    return;
+                }
+                // 调用后端API
+                try {
+                    const response = await fetch(`${API_BASE_URL}/projects/${projectId}/name`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: newName })
+                    });
+                    const result = await response.json();
+                    if (response.ok) {
+                        showMessage('项目名称修改成功', 'success');
+                        await loadProjects();
+                    } else {
+                        showMessage(result.error || '修改失败', 'error');
+                    }
+                } catch (error) {
+                    showMessage('修改失败: ' + error.message, 'error');
+                }
+                input.style.display = 'none';
+                document.getElementById(`projectNameDisplay-${projectId}`).style.display = 'inline';
+            } else if (event.key === 'Escape') {
+                input.style.display = 'none';
+                document.getElementById(`projectNameDisplay-${projectId}`).style.display = 'inline';
+            }
+        }
+
+        function showSidebarProjectNameEdit(projectId) {
+            document.getElementById(`sidebarProjectNameDisplay-${projectId}`).style.display = 'none';
+            const input = document.getElementById(`sidebarProjectNameInput-${projectId}`);
+            input.style.display = 'inline-block';
+            input.focus();
+            input.select();
+        }
+
+        async function handleSidebarProjectNameEdit(event, projectId) {
+            const input = document.getElementById(`sidebarProjectNameInput-${projectId}`);
+            if (event.key === 'Enter') {
+                const newName = input.value.trim();
+                if (!newName) {
+                    showMessage('项目名称不能为空', 'error');
+                    return;
+                }
+                // 调用后端API
+                try {
+                    const response = await fetch(`${API_BASE_URL}/projects/${projectId}/name`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: newName })
+                    });
+                    const result = await response.json();
+                    if (response.ok) {
+                        showMessage('项目名称修改成功', 'success');
+                        await loadProjects();
+                    } else {
+                        showMessage(result.error || '修改失败', 'error');
+                    }
+                } catch (error) {
+                    showMessage('修改失败: ' + error.message, 'error');
+                }
+                input.style.display = 'none';
+                document.getElementById(`sidebarProjectNameDisplay-${projectId}`).style.display = 'inline';
+            } else if (event.key === 'Escape') {
+                input.style.display = 'none';
+                document.getElementById(`sidebarProjectNameDisplay-${projectId}`).style.display = 'inline';
+            }
+        }
     </script>
 </body>
 </html>
