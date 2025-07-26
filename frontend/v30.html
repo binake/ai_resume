@@ -375,7 +375,17 @@
                 <div class="content-area" id="ai-chat" style="height: calc(100vh - 60px); min-height: 600px;">
                     <div style="flex: 1; display: flex; flex-direction: column; height: 100%;">
                         <iframe
-                            src="http://localhost/chat?dialogId=7e0f210a66fd11f097190242ac120003&conversationId=432c8f6f1f25426a912b95623a2008c8&isNew="
+                            src="http://localhost/chat"
+                            style="width: 100%; height: 100%; border: none;"
+                            frameborder="0"
+                        ></iframe>
+                    </div>
+                </div>
+                <!-- AI对话页面（只在这里有iframe） -->
+                <div class="content-area" id="ai-analysis" style="height: calc(100vh - 60px); min-height: 600px;">
+                    <div style="flex: 1; display: flex; flex-direction: column; height: 100%;">
+                        <iframe
+                            src="http://localhost/search"
                             style="width: 100%; height: 100%; border: none;"
                             frameborder="0"
                         ></iframe>

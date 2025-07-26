@@ -523,27 +523,37 @@ class MongoDBClient:
     def delete_file(self, file_id):
         """删除文件"""
         try:
+            # 获取文件信息
             file_doc = self.files_collection.find_one({"file_id": file_id})
             if not file_doc:
                 return False
-
-            # 删除磁盘上的文件
-            if os.path.exists(file_doc['file_path']):
-                os.remove(file_doc['file_path'])
-
+            
+            # 删除物理文件
+            file_path = file_doc.get("file_path")
+            if file_path and os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                    logger.info(f"删除物理文件: {file_path}")
+                except Exception as e:
+                    logger.warning(f"删除物理文件失败: {e}")
+            
             # 删除数据库记录
-            self.files_collection.delete_one({"_id": file_doc["_id"]})
-
-            # 如果是项目文件，更新项目文件计数
-            if file_doc.get('category') == 'project' and file_doc.get('project_id'):
-                self.projects_collection.update_one(
-                    {"_id": ObjectId(file_doc['project_id'])},
-                    {"$inc": {"file_count": -1}, "$set": {"updated_at": datetime.now()}}
-                )
-
-            logger.info(f"成功删除文件: {file_doc['originalname']}")
-            return True
-
+            result = self.files_collection.delete_one({"file_id": file_id})
+            
+            if result.deleted_count > 0:
+                # 如果是项目文件，更新项目文件计数
+                if file_doc.get("category") == "project" and file_doc.get("project_id"):
+                    self.projects_collection.update_one(
+                        {"_id": ObjectId(file_doc["project_id"])},
+                        {"$inc": {"file_count": -1}, "$set": {"updated_at": datetime.now()}}
+                    )
+                
+                logger.info(f"成功删除文件: {file_id}")
+                return True
+            else:
+                logger.warning(f"文件删除失败: {file_id}")
+                return False
+                
         except Exception as e:
             logger.error(f"删除文件失败: {e}")
             return False
@@ -1575,6 +1585,20 @@ def find_available_port(start_port=5000, max_attempts=10):
         except socket.error:
             continue
     return None
+
+
+@app.route('/api/files/<file_id>', methods=['DELETE'])
+def delete_file_api(file_id):
+    """删除文件"""
+    try:
+        success = mongo_client.delete_file(file_id)
+        if success:
+            return create_json_response({"message": "文件删除成功"})
+        else:
+            return create_json_response({"error": "文件不存在或删除失败"}, 404)
+    except Exception as e:
+        logger.error(f"删除文件失败: {e}")
+        return create_json_response({"error": "服务器内部错误"}, 500)
 
 
 if __name__ == '__main__':
