@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI简历分析系统</title>
     <link rel="stylesheet" href="css/style.css">
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
     <div class="container">
@@ -523,6 +525,7 @@
         let allProjects = [];
         let currentCategoryFiles = {}; // 存储各类别的文件列表
         let currentProjectFiles = []; // 存储当前项目的文件列表
+        let currentDashboardFileId = null;
 
         // 字段分组定义 - 使用后端返回的自定义结构
         let FIELD_GROUPS = {};
@@ -1018,6 +1021,7 @@
                 const skills = Array.isArray(resume.skills_objs) ? resume.skills_objs : [];
                 return `
                 <div class="resume-card">
+                    <input type="file" id="${resume._id}" style="display: none;" accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif,.xls,.xlsx,.ppt,.pptx,.md">
                     <div class="card-header">
                         <div class="avatar">
                             ${resume.name ? resume.name.charAt(0) : 'U'}
@@ -1051,7 +1055,7 @@
                         ` : ''}
                     </div>
                     <div class="card-actions">
-                        <button class="btn-small primary" onclick="viewDetails('${resume._id}')">查看详情</button>
+                        <button class="btn-small primary" onclick="viewDetails('${resume._id}', '${resume.file_id}')">查看详情</button>
                         <button class="btn-small" onclick="editResume('${resume._id}')">编辑</button>
                         <button class="btn-small danger" onclick="deleteResume('${resume._id}')">删除</button>
                     </div>
@@ -1772,9 +1776,37 @@ async function parseFile(fileId, filename) {
             }
         }
 
-        function viewDetails(id) {
+        async function printResumeToFile(name) {
+            var element = document.getElementById("cardContainer");
+            var opt = {
+                margin: 1,
+                filename: `${name}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save();
+            /*
+            const opt = {
+                margin: 10,
+                filename: `${resume.name || 'resume'}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            try {
+                const pdfBlob = await html2pdf().from(element).set(opt).output('blob');
+                const formData = new FormData();
+
+            }*/
+        }
+
+        function viewDetails(id, file_id) {
             const resume = allResumes.find(r => r._id === id);
             if (!resume) return;
+
+            currentDashboardFileId = file_id
 
             // 添加调试信息
             console.log('=== 查看详情调试信息 ===');
@@ -1784,12 +1816,13 @@ async function parseFile(fileId, filename) {
             console.log('字段分组:', FIELD_GROUPS);
             console.log('字段分组显示:', FIELD_GROUPS_DISPLAY);
             console.log('简历字段列表:', Object.keys(resume));
+            console.log('dashboardid', currentDashboardFileId);
 
             // 左右分栏布局：左侧预览，右侧操作
             const modalContent = `
                 <div style="display: flex; gap: 20px; height: 80vh;">
                     <!-- 左侧预览区域 -->
-                    <div style="flex: 1; overflow-y: auto; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                    <div id="cardContainer" style="flex: 1; overflow-y: auto; padding: 20px; background: #f8f9fa; border-radius: 8px;">
                         <div style="background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                             ${generateResumePreview(resume)}
                         </div>
@@ -1817,7 +1850,8 @@ async function parseFile(fileId, filename) {
                             <h4 style="margin-bottom: 15px; color: #1a73e8;">操作</h4>
                             <button class="action-btn" onclick="editResume('${id}')" style="width: 100%; margin-bottom: 10px;">✏️ 编辑简历</button>
                             <button class="action-btn secondary" onclick="exportResume('${id}')" style="width: 100%; margin-bottom: 10px;">📄 导出数据</button>
-                            <button class="action-btn danger" onclick="deleteResume('${id}')" style="width: 100%;">🗑️ 删除简历</button>
+                            <button class="action-btn danger" onclick="deleteResume('${id}')" style="width: 100%; margin-bottom: 10px;">🗑️ 删除简历</button>
+                            <button class="action-btn secondary" onclick="printResumeToFile('${id}')" style="width: 100%; margin-bottom: 10px;" id="btnPrint">💾 下载简历 </button>
                         </div>
                     </div>
                 </div>
