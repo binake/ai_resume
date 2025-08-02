@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI简历分析系统</title>
     <link rel="stylesheet" href="css/style.css">
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
     <div class="container">
@@ -653,6 +655,12 @@
             </div>
         </div>
     </div>
+    
+    <div class="sidemodal" id="detailSideModal">
+        <div class="sideModal-body" id ="sideModalBody">
+            
+        </div>
+    </div>
 
     <!-- 状态消息 -->
     <div class="status-message" id="statusMessage"></div>
@@ -667,6 +675,7 @@
         let allProjects = [];
         let currentCategoryFiles = {}; // 存储各类别的文件列表
         let currentProjectFiles = []; // 存储当前项目的文件列表
+        let currentDashboardFileId = null;
 
         // 字段分组定义 - 使用后端返回的自定义结构
         let FIELD_GROUPS = {};
@@ -1168,6 +1177,7 @@
                 const skills = Array.isArray(resume.skills_objs) ? resume.skills_objs : [];
                 return `
                 <div class="resume-card">
+                    <input type="file" id="${resume._id}" style="display: none;" accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif,.xls,.xlsx,.ppt,.pptx,.md">
                     <div class="card-header">
                         <div class="avatar">
                             ${resume.name ? resume.name.charAt(0) : 'U'}
@@ -1201,7 +1211,7 @@
                         ` : ''}
                     </div>
                     <div class="card-actions">
-                        <button class="btn-small primary" onclick="viewDetails('${resume._id}')">查看详情</button>
+                        <button class="btn-small primary" onclick="viewDetails('${resume._id}', '${resume.file_id}')">查看详情</button>
                         <button class="btn-small" onclick="editResume('${resume._id}')">编辑</button>
                         <button class="btn-small danger" onclick="deleteResume('${resume._id}')">删除</button>
                     </div>
@@ -1946,9 +1956,98 @@ async function parseFile(fileId, filename) {
             }
         }
 
-        function viewDetails(id) {
+        async function printResumeToFile(name) {
+            var element = document.getElementById("cardContainer");
+            var opt = {
+                margin: 1,
+                filename: `${name}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save();
+            /*
+            const opt = {
+                margin: 10,
+                filename: `${resume.name || 'resume'}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            try {
+                const pdfBlob = await html2pdf().from(element).set(opt).output('blob');
+                const formData = new FormData();
+
+            }*/
+        }
+
+        function viewCompanyDetails(company) {
+            console.log("viewCompanyDetails clicked");
+            console.log(document.getElementById("detailSideModal"))
+            const sideModalContent = `
+                <div style="display: flex; height: 100%;">
+                    <div id="cardContainer" style="flex: 1; overflow-y: auto; background: #f8f9fa; border-radius: 8px; ">
+                        <div style="background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); min-height: 100%;">
+                            ${generateCompanyPreview(company)}
+                        </div>
+                    </div>
+                    <button class="close-btn-side" onclick="closeSideModal()"> > </button>
+                </div> 
+            `;
+            document.getElementById('sideModalBody').innerHTML = sideModalContent;
+            document.getElementById('detailSideModal').style.display = 'flex';
+            document.getElementById('detailSideModal').style.position = 'fixed';
+        }
+
+        function generateCompanyPreview(company) {
+            return `
+                <div style="min-height: 5vh; border-bottom: 2px solid #e8eaed; padding: 15px; margin-bottom: 15px; display: flex; align-items: center">
+                    <img src="https://www.freelogodesign.org/assets/img/categories/32/logo-img-01.svg" 
+                    alt="Tech Company Logo"
+                    style="width: 100px; height: 100%; margin: 0 10px 0 0;">
+                    <div style="display: flex; flex-direction: column;">
+                        <h3 style="color: #1a73e8; margin-bottom: 15px;">
+                            ${company}
+                        </h3>
+                        <div> 匹配公司： Lorem ipsum dolor sit amet  </div>
+                    </div>
+                </div>
+                <h3 style="color: #1a73e8; margin-bottom: 15px;">
+                    ℹ️ 公司簡介
+                </h3> 
+                <div style="margin-bottom: 15px;">
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                    Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
+                    Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
+                    Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                    Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
+                    Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
+                    Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                    Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
+                    Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
+                    Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+                </div>
+                <h3 style="color: #1a73e8; margin-bottom: 15px;">
+                    ✨ 工商消息
+                </h3> 
+                <div style="margin-bottom: 8px;"><strong>成立時間:</strong> </div>
+                <div style="margin-bottom: 8px;"><strong>注冊資本:</strong> </div>
+                <div style="margin-bottom: 8px;"><strong>法人代表:</strong> </div>
+                <div style="margin-bottom: 8px;"><strong>所在地:</strong> </div>
+                <div style="margin-bottom: 8px;"><strong>所屬行業:</strong> </div>
+                <div style="margin-bottom: 8px;"><strong>企業類型:</strong> </div>
+                
+            `;
+        }
+
+        function viewDetails(id, file_id) {
             const resume = allResumes.find(r => r._id === id);
             if (!resume) return;
+
+            currentDashboardFileId = file_id
 
             // 添加调试信息
             console.log('=== 查看详情调试信息 ===');
@@ -1958,12 +2057,13 @@ async function parseFile(fileId, filename) {
             console.log('字段分组:', FIELD_GROUPS);
             console.log('字段分组显示:', FIELD_GROUPS_DISPLAY);
             console.log('简历字段列表:', Object.keys(resume));
+            console.log('dashboardid', currentDashboardFileId);
 
             // 左右分栏布局：左侧预览，右侧操作
             const modalContent = `
                 <div style="display: flex; gap: 20px; height: 80vh;">
                     <!-- 左侧预览区域 -->
-                    <div style="flex: 1; overflow-y: auto; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                    <div id="cardContainer" style="flex: 1; overflow-y: auto; padding: 20px; background: #f8f9fa; border-radius: 8px;">
                         <div style="background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                             ${generateResumePreview(resume)}
                         </div>
@@ -1991,7 +2091,8 @@ async function parseFile(fileId, filename) {
                             <h4 style="margin-bottom: 15px; color: #1a73e8;">操作</h4>
                             <button class="action-btn" onclick="editResume('${id}')" style="width: 100%; margin-bottom: 10px;">✏️ 编辑简历</button>
                             <button class="action-btn secondary" onclick="exportResume('${id}')" style="width: 100%; margin-bottom: 10px;">📄 导出数据</button>
-                            <button class="action-btn danger" onclick="deleteResume('${id}')" style="width: 100%;">🗑️ 删除简历</button>
+                            <button class="action-btn danger" onclick="deleteResume('${id}')" style="width: 100%; margin-bottom: 10px;">🗑️ 删除简历</button>
+                            <button class="action-btn secondary" onclick="printResumeToFile('${id}')" style="width: 100%; margin-bottom: 10px;" id="btnPrint">💾 下载简历 </button>
                         </div>
                     </div>
                 </div>
@@ -2152,7 +2253,11 @@ async function parseFile(fileId, filename) {
                         <div style="font-weight: 600; color: #202124;">${work.job_position || '职位未填写'}</div>
                         <span style="background: #34a853; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">工作</span>
                     </div>
-                    <div style="color: #5f6368; margin-bottom: 8px;">🏢 ${work.company_name || '公司未填写'}</div>
+                    <div style="color: #5f6368; margin-bottom: 8px;">
+                        🏢 <a onclick="viewCompanyDetails('${work.company_name || '公司未填写'}')" style="color: #5f6368; text-decoration: underline; cursor: pointer;">
+                        ${work.company_name || '公司未填写'}
+                        </a>
+                    </div>
                     ${work.department_name ? `<div style="color: #5f6368; margin-bottom: 8px;">🏢 ${work.department_name}</div>` : ''}
                     <div style="color: #5f6368; margin-bottom: 8px; font-size: 12px;">📅 ${work.work_start_time || ''} - ${work.work_end_time || ''}</div>
                     ${work.salary ? `<div style="color: #5f6368; margin-bottom: 8px;">💰 ${work.salary}</div>` : ''}
@@ -2577,6 +2682,10 @@ async function parseFile(fileId, filename) {
             document.getElementById('detailModal').style.display = 'none';
         }
 
+        function closeSideModal() {
+            document.getElementById('detailSideModal').style.display = 'none';
+        }
+
         function showProjectManager() {
             renderProjectManagerList();
             document.getElementById('projectManagerModal').style.display = 'flex';
@@ -2821,6 +2930,7 @@ async function parseFile(fileId, filename) {
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeModal();
+                closeSideModal();
             }
             if (e.ctrlKey && e.key === 'r') {
                 e.preventDefault();

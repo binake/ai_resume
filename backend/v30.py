@@ -154,7 +154,7 @@ class MongoDBClient:
     def get_all_result_data(self):
         """获取parseresults集合中所有文档的自定义数据字段"""
         try:
-            cursor = self.collection.find({}, {"custom_data": 1, "original_data": 1, "_id": 1})
+            cursor = self.collection.find({}, {"custom_data": 1, "original_data": 1, "_id": 1, "file_id": 1})
             results = []
 
             for document in cursor:
@@ -165,6 +165,7 @@ class MongoDBClient:
                     result_data = self.ensure_utf8_encoding(result_data)
                     # 添加MongoDB的_id字段
                     result_data["_id"] = str(document["_id"])
+                    result_data["file_id"] = str(document["file_id"])
                     results.append(result_data)
                 elif "original_data" in document and "result" in document["original_data"]:
                     # 如果没有自定义数据，则使用原始数据并尝试映射
@@ -172,6 +173,7 @@ class MongoDBClient:
                     result_data = self.map_parser_result_to_custom_structure(original_result)
                     result_data = self.ensure_utf8_encoding(result_data)
                     result_data["_id"] = str(document["_id"])
+                    result_data["file_id"] = str(document["file_id"])
                     results.append(result_data)
 
             logger.info(f"成功获取 {len(results)} 条记录")
