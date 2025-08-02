@@ -511,6 +511,12 @@
             </div>
         </div>
     </div>
+    
+    <div class="sidemodal" id="detailSideModal">
+        <div class="sideModal-body" id ="sideModalBody">
+            
+        </div>
+    </div>
 
     <!-- 状态消息 -->
     <div class="status-message" id="statusMessage"></div>
@@ -1802,6 +1808,67 @@ async function parseFile(fileId, filename) {
             }*/
         }
 
+        function viewCompanyDetails(company) {
+            console.log("viewCompanyDetails clicked");
+            console.log(document.getElementById("detailSideModal"))
+            const sideModalContent = `
+                <div style="display: flex; height: 100%;">
+                    <div id="cardContainer" style="flex: 1; overflow-y: auto; background: #f8f9fa; border-radius: 8px; ">
+                        <div style="background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); min-height: 100%;">
+                            ${generateCompanyPreview(company)}
+                        </div>
+                    </div>
+                    <button class="close-btn-side" onclick="closeSideModal()"> > </button>
+                </div> 
+            `;
+            document.getElementById('sideModalBody').innerHTML = sideModalContent;
+            document.getElementById('detailSideModal').style.display = 'flex';
+            document.getElementById('detailSideModal').style.position = 'fixed';
+        }
+
+        function generateCompanyPreview(company) {
+            return `
+                <div style="min-height: 5vh; border-bottom: 2px solid #e8eaed; padding: 15px; margin-bottom: 15px; display: flex; align-items: center">
+                    <img src="https://www.freelogodesign.org/assets/img/categories/32/logo-img-01.svg" 
+                    alt="Tech Company Logo"
+                    style="width: 100px; height: 100%; margin: 0 10px 0 0;">
+                    <div style="display: flex; flex-direction: column;">
+                        <h3 style="color: #1a73e8; margin-bottom: 15px;">
+                            ${company}
+                        </h3>
+                        <div> 匹配公司： Lorem ipsum dolor sit amet  </div>
+                    </div>
+                </div>
+                <h3 style="color: #1a73e8; margin-bottom: 15px;">
+                    ℹ️ 公司簡介
+                </h3> 
+                <div style="margin-bottom: 15px;">
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                    Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
+                    Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
+                    Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                    Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
+                    Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
+                    Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                    Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
+                    Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
+                    Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+                </div>
+                <h3 style="color: #1a73e8; margin-bottom: 15px;">
+                    ✨ 工商消息
+                </h3> 
+                <div style="margin-bottom: 8px;"><strong>成立時間:</strong> </div>
+                <div style="margin-bottom: 8px;"><strong>注冊資本:</strong> </div>
+                <div style="margin-bottom: 8px;"><strong>法人代表:</strong> </div>
+                <div style="margin-bottom: 8px;"><strong>所在地:</strong> </div>
+                <div style="margin-bottom: 8px;"><strong>所屬行業:</strong> </div>
+                <div style="margin-bottom: 8px;"><strong>企業類型:</strong> </div>
+                
+            `;
+        }
+
         function viewDetails(id, file_id) {
             const resume = allResumes.find(r => r._id === id);
             if (!resume) return;
@@ -2012,7 +2079,11 @@ async function parseFile(fileId, filename) {
                         <div style="font-weight: 600; color: #202124;">${work.job_position || '职位未填写'}</div>
                         <span style="background: #34a853; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">工作</span>
                     </div>
-                    <div style="color: #5f6368; margin-bottom: 8px;">🏢 ${work.company_name || '公司未填写'}</div>
+                    <div style="color: #5f6368; margin-bottom: 8px;">
+                        🏢 <a onclick="viewCompanyDetails('${work.company_name || '公司未填写'}')" style="color: #5f6368; text-decoration: underline; cursor: pointer;">
+                        ${work.company_name || '公司未填写'}
+                        </a>
+                    </div>
                     ${work.department_name ? `<div style="color: #5f6368; margin-bottom: 8px;">🏢 ${work.department_name}</div>` : ''}
                     <div style="color: #5f6368; margin-bottom: 8px; font-size: 12px;">📅 ${work.work_start_time || ''} - ${work.work_end_time || ''}</div>
                     ${work.salary ? `<div style="color: #5f6368; margin-bottom: 8px;">💰 ${work.salary}</div>` : ''}
@@ -2437,6 +2508,10 @@ async function parseFile(fileId, filename) {
             document.getElementById('detailModal').style.display = 'none';
         }
 
+        function closeSideModal() {
+            document.getElementById('detailSideModal').style.display = 'none';
+        }
+
         function showProjectManager() {
             renderProjectManagerList();
             document.getElementById('projectManagerModal').style.display = 'flex';
@@ -2681,6 +2756,7 @@ async function parseFile(fileId, filename) {
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeModal();
+                closeSideModal();
             }
             if (e.ctrlKey && e.key === 'r') {
                 e.preventDefault();
