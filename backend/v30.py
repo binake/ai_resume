@@ -23,6 +23,7 @@ from werkzeug.utils import secure_filename
 from pathlib import Path
 import uuid
 from parser_service import ResumeParserService
+import requests
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -453,7 +454,13 @@ class MongoDBClient:
                 "parse_enabled": True,      # 是否启用解析
                 "parse_result": None,       # 解析结果
                 "parse_error": None,        # 解析错误信息
-                "parse_date": None          # 解析完成时间
+                "parse_date": None,         # 解析完成时间
+                # 添加RAG同步状态相关字段
+                "sync_status": "pending",   # pending, processing, completed, failed
+                "sync_enabled": True,       # 是否启用同步
+                "sync_result": None,        # 同步结果
+                "sync_error": None,         # 同步错误信息
+                "sync_date": None           # 同步完成时间
             }
             print(f"[DEBUG] 保存到数据库的original_filename: {repr(file_document['original_filename'])}")
             result = self.files_collection.insert_one(file_document)
@@ -1452,6 +1459,44 @@ def parse_file(file_id):
         return create_json_response({"error": "解析失败", "detail": str(e)}, 500)
 
 
+@app.route('/api/files/<file_id>/sync-status', methods=['PUT'])
+def update_sync_status(file_id):
+    """更新文件同步状态"""
+    try:
+        data = request.get_json()
+        if not data:
+            return create_json_response({"error": "请求数据为空"}, 400)
+
+        update_fields = {}
+        if 'sync_status' in data:
+            update_fields['sync_status'] = data['sync_status']
+        if 'sync_enabled' in data:
+            update_fields['sync_enabled'] = data['sync_enabled']
+        if 'sync_result' in data:
+            update_fields['sync_result'] = data['sync_result']
+        if 'sync_error' in data:
+            update_fields['sync_error'] = data['sync_error']
+
+        if data.get('sync_status') == 'completed':
+            update_fields['sync_date'] = datetime.now()
+
+        update_fields['updated_at'] = datetime.now()
+
+        result = mongo_client.files_collection.update_one(
+            {"file_id": file_id},
+            {"$set": update_fields}
+        )
+
+        if result.matched_count > 0:
+            return create_json_response({"message": "同步状态更新成功"})
+        else:
+            return create_json_response({"error": "文件不存在"}, 404)
+
+    except Exception as e:
+        logger.error(f"更新同步状态失败: {e}")
+        return create_json_response({"error": "服务器内部错误"}, 500)
+
+
 # ============ 系统信息API ============
 @app.route('/api/system/info', methods=['GET'])
 def get_system_info():
@@ -1601,6 +1646,108 @@ def delete_file_api(file_id):
     except Exception as e:
         logger.error(f"删除文件失败: {e}")
         return create_json_response({"error": "服务器内部错误"}, 500)
+
+
+@app.route('/api/files/<file_id>/info', methods=['GET'])
+def get_file_info(file_id):
+    """获取文件详细信息"""
+    try:
+        file_doc = mongo_client.get_file_by_id(file_id)
+        if not file_doc:
+            return create_json_response({"error": "文件不存在"}, 404)
+
+        # 返回文件信息，包括原始文件名
+        file_info = {
+            "file_id": file_doc['file_id'],
+            "original_filename": file_doc.get('original_filename', ''),
+            "filename": file_doc.get('filename', ''),
+            "file_path": file_doc.get('file_path', ''),
+            "category": file_doc.get('category', ''),
+            "size": file_doc.get('size', 0),
+            "mimetype": file_doc.get('mimetype', ''),
+            "upload_date": file_doc.get('upload_date'),
+            "sync_status": file_doc.get('sync_status', 'pending'),
+            "parse_status": file_doc.get('parse_status', 'pending')
+        }
+
+        # 处理datetime序列化
+        file_info = mongo_client.serialize_datetime(file_info)
+
+        return create_json_response(file_info)
+
+    except Exception as e:
+        logger.error(f"获取文件信息错误: {e}")
+        return create_json_response({"error": "获取文件信息失败"}, 500)
+
+
+@app.route('/api/files/<file_id>/server-path', methods=['GET'])
+def get_file_server_path(file_id):
+    """获取文件在服务器上的路径信息"""
+    try:
+        file_doc = mongo_client.get_file_by_id(file_id)
+        if not file_doc:
+            return create_json_response({"error": "文件不存在"}, 404)
+
+        # 获取文件的实际路径
+        file_path = file_doc.get('file_path', '')
+        
+        # 返回文件路径信息
+        path_info = {
+            "file_id": file_doc['file_id'],
+            "original_filename": file_doc.get('original_filename', ''),
+            "server_path": file_path,  # 直接使用file_path字段
+            "category": file_doc.get('category', ''),
+            "size": file_doc.get('size', 0),
+            "mimetype": file_doc.get('mimetype', ''),
+            "exists": os.path.exists(file_path) if file_path else False
+        }
+
+        # 处理datetime序列化
+        path_info = mongo_client.serialize_datetime(path_info)
+
+        logger.info(f"获取文件路径信息: {file_id} -> {file_path}")
+        return create_json_response(path_info)
+
+    except Exception as e:
+        logger.error(f"获取文件服务器路径错误: {e}")
+        return create_json_response({"error": "获取文件路径失败"}, 500)
+
+
+@app.route('/api/files/<file_id>/sync-to-rag', methods=['POST'])
+def sync_file_to_rag(file_id):
+    """将本地文件直接同步到RAGFlow（后端直传）"""
+    try:
+        # 1. 查找文件路径
+        file_doc = mongo_client.get_file_by_id(file_id)
+        if not file_doc:
+            return create_json_response({'error': '文件不存在'}, 404)
+        file_path = file_doc.get('file_path')
+        filename = file_doc.get('original_filename', file_doc.get('filename'))
+        if not file_path or not os.path.exists(file_path):
+            return create_json_response({'error': '文件路径无效或文件不存在'}, 404)
+
+        # 2. 获取RAG参数
+        data = request.get_json(force=True)
+        rag_api_url = data.get('rag_api_url')
+        rag_api_key = data.get('rag_api_key')
+        dataset_id = data.get('dataset_id')
+        if not all([rag_api_url, rag_api_key, dataset_id]):
+            return create_json_response({'error': '缺少RAG参数'}, 400)
+
+        # 3. 上传到RAG
+        url = f"{rag_api_url}/datasets/{dataset_id}/documents"
+        headers = {"Authorization": f"Bearer {rag_api_key}"}
+        with open(file_path, "rb") as f:
+            files = {"file": (filename, f)}
+            response = requests.post(url, headers=headers, files=files)
+        try:
+            result = response.json()
+        except Exception:
+            result = {'error': 'RAG响应不是JSON', 'text': response.text}
+        return create_json_response(result, response.status_code)
+    except Exception as e:
+        logger.error(f"RAG同步失败: {e}")
+        return create_json_response({'error': 'RAG同步失败', 'detail': str(e)}, 500)
 
 
 if __name__ == '__main__':
